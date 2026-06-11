@@ -1,0 +1,63 @@
+name: brahma-kalasha
+region: blr
+services:
+  - name: api
+    environment_slug: node-js
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: Chan-electro/Resturant-Booking-App
+    source_dir: /
+    build_command: npm run build
+    run_command: node apps/api/dist/main
+    http_port: 3001
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${db.DATABASE_URL}
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        value: change-me-to-a-very-long-secure-random-string
+      - key: JWT_REFRESH_SECRET
+        scope: RUN_TIME
+        value: change-me-to-another-very-long-secure-random-string
+      - key: JWT_EXPIRES_IN
+        scope: RUN_TIME
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        scope: RUN_TIME
+        value: 7d
+      - key: PORT
+        scope: RUN_TIME
+        value: "3001"
+      - key: FRONTEND_URL
+        scope: RUN_TIME
+        value: ${web.URL}
+
+  - name: web
+    environment_slug: node-js
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: Chan-electro/Resturant-Booking-App
+    source_dir: /
+    build_command: npm run build
+    run_command: npm run start --workspace=apps/web
+    http_port: 3000
+    envs:
+      - key: NEXT_PUBLIC_API_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${api.URL}/api/v1
+      - key: NEXTAUTH_URL
+        scope: RUN_TIME
+        value: ${web.URL}
+      - key: NEXTAUTH_SECRET
+        scope: RUN_TIME
+        value: change-me-to-a-very-long-secure-random-string
+
+databases:
+  - engine: PG
+    name: db
+    num_nodes: 1
+    size: db-s-dev-database
+    version: "15"
