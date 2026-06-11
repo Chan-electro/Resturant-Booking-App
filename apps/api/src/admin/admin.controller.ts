@@ -20,6 +20,7 @@ import {
   UpdateUserStatusDto,
   CreateCouponDto,
   UpdateCouponDto,
+  CreateUserDto,
 } from './dto/admin.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -34,6 +35,13 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   // ===================== USERS =====================
+
+  @Post('users')
+  @ApiOperation({ summary: 'Create a new user/staff account (Admin only)' })
+  async createUser(@Body() dto: CreateUserDto) {
+    const user = await this.adminService.createUser(dto);
+    return { success: true, data: user };
+  }
 
   @Get('users')
   @ApiOperation({ summary: 'List all users (Admin only)' })

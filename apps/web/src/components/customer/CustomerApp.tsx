@@ -684,7 +684,7 @@ export default function CustomerApp() {
   return (
     <div className="w-full min-h-screen bg-cream relative pb-24">
       {/* Header */}
-      <header className="text-cream px-6 pt-12 pb-14 shadow-sm relative z-30 overflow-visible max-w-md lg:max-w-6xl mx-auto lg:mt-6">
+      <header className="text-cream px-6 pt-12 pb-10 shadow-sm relative z-30 overflow-visible max-w-md lg:max-w-6xl mx-auto lg:mt-6">
         {/* Background rounded wrapper to clip blur circles */}
         <div className="absolute inset-0 bg-maroon rounded-b-[2rem] lg:rounded-[2rem] overflow-hidden pointer-events-none" />
         <div className="absolute inset-0 overflow-hidden rounded-b-[2rem] lg:rounded-[2rem] pointer-events-none">
@@ -747,7 +747,7 @@ export default function CustomerApp() {
       </header>
 
       {/* Search Toggle */}
-      <div className="px-5 -mt-5 relative z-20 max-w-md lg:max-w-6xl mx-auto lg:px-8">
+      <div className="px-5 mt-6 relative z-20 max-w-md lg:max-w-6xl mx-auto lg:px-8">
         <button
           onClick={() => setShowSearch(!showSearch)}
           className="w-full bg-white rounded-2xl p-4 shadow-sm border border-ivory flex items-center gap-3 text-maroon/40 hover:border-gold/30 transition-colors"

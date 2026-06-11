@@ -1,17 +1,55 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   UpdateUserRoleDto,
   UpdateUserStatusDto,
   CreateCouponDto,
   UpdateCouponDto,
+  CreateUserDto,
 } from './dto/admin.dto';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ===================== USERS =====================
+
+  async createUser(dto: CreateUserDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
+    }
+    if (dto.phone) {
+      const existingPhone = await this.prisma.user.findUnique({
+        where: { phone: dto.phone },
+      });
+      if (existingPhone) {
+        throw new ConflictException('User with this phone already exists');
+      }
+    }
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    return this.prisma.user.create({
+      data: {
+        name: dto.name,
+        email: dto.email,
+        passwordHash,
+        phone: dto.phone,
+        role: dto.role as any,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+  }
 
   async getAllUsers(page = 1, pageSize = 20, role?: string, search?: string) {
     const skip = (page - 1) * pageSize;

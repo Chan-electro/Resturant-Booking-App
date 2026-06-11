@@ -75,19 +75,33 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Logout and clear tokens' })
+  @ApiOperation({ summary: 'Logout and invalidate refresh token' })
   async logout(
-    @CurrentUser() user: any,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = (req.cookies as Record<string, string>)?.refresh_token;
-    await this.authService.logout(user.id, refreshToken);
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token');
-    return { success: true, data: { message: 'Logged out successfully' } };
+    const cookies = (req.cookies as Record<string, string>) || {};
+    const accessToken = cookies.access_token;
+    const refreshToken = cookies.refresh_token;
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+
+    try {
+      await this.authService.logout(accessToken, refreshToken);
+    } catch (err) {
+      // Ignore database session errors to guarantee client cookies are cleared
+    }
+    return { success: true, message: 'Logged out successfully' };
   }
 
   @Get('google')

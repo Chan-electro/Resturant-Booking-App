@@ -197,7 +197,18 @@ export const analyticsApi = {
 // ===================== ADMIN =====================
 
 export const adminApi = {
-  users: (page = 1) => request(`/admin/users?page=${page}`),
+  users: (page = 1, role = "", search = "") => {
+    const params = new URLSearchParams({
+      page: String(page),
+      ...(role && { role }),
+      ...(search && { search }),
+    });
+    return request(`/admin/users?${params.toString()}`);
+  },
+  createUser: (data: object) =>
+    request("/admin/users", { method: "POST", body: JSON.stringify(data) }),
+  updateUserStatus: (id: string, isActive: boolean) =>
+    request(`/admin/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }),
   updateUserRole: (id: string, role: string) =>
     request(`/admin/users/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
   coupons: () => request("/admin/coupons"),

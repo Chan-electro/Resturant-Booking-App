@@ -157,13 +157,43 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string, refreshToken?: string) {
-    if (refreshToken) {
-      await this.prisma.session.deleteMany({
-        where: { userId, sessionToken: refreshToken },
-      });
-    } else {
-      await this.prisma.session.deleteMany({ where: { userId } });
+  async logout(accessToken?: string, refreshToken?: string) {
+    let userId: string | null = null;
+
+    if (accessToken) {
+      try {
+        const decoded = await this.jwtService.verifyAsync(accessToken, {
+          secret:
+            this.configService.get<string>('JWT_SECRET') ||
+            'brahma-kalasha-super-secret-jwt-key',
+        });
+        userId = decoded.sub;
+      } catch (err) {
+        // Access token might be expired, try decoding refresh token
+      }
+    }
+
+    if (!userId && refreshToken) {
+      try {
+        const decoded = await this.jwtService.verifyAsync(refreshToken, {
+          secret:
+            this.configService.get<string>('JWT_REFRESH_SECRET') ||
+            'brahma-kalasha-refresh-secret',
+        });
+        userId = decoded.sub;
+      } catch (err) {
+        // Both tokens are invalid or expired
+      }
+    }
+
+    if (userId) {
+      if (refreshToken) {
+        await this.prisma.session.deleteMany({
+          where: { userId, sessionToken: refreshToken },
+        });
+      } else {
+        await this.prisma.session.deleteMany({ where: { userId } });
+      }
     }
     return { message: 'Logged out successfully' };
   }

@@ -20,6 +20,16 @@ import {
   Download,
   Bell,
   FileText,
+  Mail,
+  Phone,
+  Calendar,
+  Lock,
+  X,
+  ShieldCheck,
+  ChefHat,
+  Bike,
+  UserCircle,
+  User,
 } from "lucide-react";
 import type { Category, MenuItem, Order, OrderStatus, PaymentMethod, PaymentStatus, DashboardStats } from "@/lib/types";
 import { cn, formatPrice, getStatusColor, formatDate, formatTime } from "@/lib/utils";
@@ -55,6 +65,107 @@ export default function AdminApp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const { state: appState } = useApp();
+
+  // User Management States
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [activeRoleFilter, setActiveRoleFilter] = useState("ALL");
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    role: "CUSTOMER",
+  });
+  const [createUserError, setCreateUserError] = useState("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  const fetchUsers = async (page = 1, role = "", search = "") => {
+    try {
+      setUsersLoading(true);
+      const res = await adminApi.users(page, role === "ALL" ? "" : role, search);
+      if (res.success && res.data) {
+        setUsers(res.data as any[]);
+        setUsersTotalPages((res as any).totalPages || 1);
+      }
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activePage === "customers") {
+      const timer = setTimeout(() => {
+        fetchUsers(usersPage, activeRoleFilter, userSearchQuery);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [activePage, usersPage, activeRoleFilter, userSearchQuery]);
+
+  const handleUpdateUserRole = async (userId: string, role: string) => {
+    try {
+      const res = await adminApi.updateUserRole(userId, role);
+      if (res.success) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, role } : u))
+        );
+      } else {
+        alert(res.error || "Failed to update user role");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating user role");
+    }
+  };
+
+  const handleUpdateUserStatus = async (userId: string, isActive: boolean) => {
+    try {
+      const res = await adminApi.updateUserStatus(userId, isActive);
+      if (res.success) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, isActive } : u))
+        );
+      } else {
+        alert(res.error || "Failed to update user status");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating user status");
+    }
+  };
+
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateUserError("");
+    setIsCreatingUser(true);
+    try {
+      const res = await adminApi.createUser(createUserForm);
+      if (res.success) {
+        setIsCreateUserModalOpen(false);
+        setCreateUserForm({
+          name: "",
+          email: "",
+          password: "",
+          phone: "",
+          role: "CUSTOMER",
+        });
+        fetchUsers(usersPage, activeRoleFilter, userSearchQuery);
+      } else {
+        setCreateUserError(res.error || "Failed to create user");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setCreateUserError("An error occurred. Make sure email and phone are unique.");
+    } finally {
+      setIsCreatingUser(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -601,19 +712,196 @@ export default function AdminApp() {
             </div>
           )}
 
-          {/* ==================== CUSTOMERS (Placeholder) ==================== */}
+          {/* ==================== CUSTOMERS & STAFF DIRECTORY ==================== */}
           {activePage === "customers" && (
             <div className="space-y-6 animate-fade-in">
-              <div className="bg-white rounded-2xl shadow-sm border border-ivory p-12 text-center">
-                <Users className="w-16 h-16 mx-auto mb-4 text-ivory" />
-                <h3 className="text-xl font-bold text-maroon mb-2">
-                  Customer Management
-                </h3>
-                <p className="text-maroon/50 max-w-md mx-auto">
-                  View and manage customer accounts, order history, and
-                  preferences. This module will be fully functional once the
-                  backend API is connected.
-                </p>
+              {/* Header Row */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <p className="text-maroon/60 font-medium text-sm">
+                    Manage users, kitchen staff, couriers, and administrators
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsCreateUserModalOpen(true)}
+                  className="bg-maroon text-cream font-bold px-5 py-2.5 rounded-xl shadow-sm hover:bg-burgundy transition-all flex items-center gap-2 text-sm active:scale-[0.98]"
+                >
+                  <Plus className="w-4 h-4" /> Add Staff / User
+                </button>
+              </div>
+
+              {/* Filters & Search Row */}
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-ivory flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Search */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-maroon/40" />
+                  <input
+                    value={userSearchQuery}
+                    onChange={(e) => {
+                      setUserSearchQuery(e.target.value);
+                      setUsersPage(1);
+                    }}
+                    className="w-full bg-cream border border-ivory rounded-xl pl-10 pr-4 py-2.5 text-sm text-maroon font-medium placeholder-maroon/30 focus:outline-none focus:border-gold"
+                    placeholder="Search by name, email..."
+                  />
+                </div>
+
+                {/* Role Filter Tabs */}
+                <div className="flex flex-wrap gap-1 bg-cream p-1.5 rounded-xl border border-ivory/50">
+                  {["ALL", "CUSTOMER", "KITCHEN", "DELIVERY", "ADMIN"].map((role) => (
+                    <button
+                      key={role}
+                      onClick={() => {
+                        setActiveRoleFilter(role);
+                        setUsersPage(1);
+                      }}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all capitalize",
+                        activeRoleFilter === role
+                          ? "bg-maroon text-cream shadow-sm"
+                          : "text-maroon/60 hover:text-maroon hover:bg-white/50"
+                      )}
+                    >
+                      {role === "ALL" ? "All Users" : role.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Users Table Card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory overflow-hidden">
+                {usersLoading ? (
+                  <div className="py-20 flex flex-col items-center justify-center gap-3">
+                    <div className="w-8 h-8 border-2 border-maroon border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-maroon/50 font-medium">Loading users...</p>
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="py-20 text-center">
+                    <Users className="w-12 h-12 text-ivory mx-auto mb-3" />
+                    <p className="font-bold text-maroon">No users found</p>
+                    <p className="text-xs text-maroon/50 mt-1">Try adjusting your search query or filters.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-cream text-maroon/60 text-xs font-bold uppercase tracking-wider border-b border-ivory">
+                          <tr>
+                            <th className="px-6 py-4">User</th>
+                            <th className="px-6 py-4">Role</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Registered</th>
+                            <th className="px-6 py-4">Change Role</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ivory text-sm">
+                          {users.map((u) => {
+                            let roleBadge = "bg-cream text-maroon/60 border-ivory";
+                            let roleIcon = <UserCircle className="w-3.5 h-3.5" />;
+                            if (u.role === "ADMIN") {
+                              roleBadge = "bg-gold/10 text-gold border-gold/30";
+                              roleIcon = <ShieldCheck className="w-3.5 h-3.5" />;
+                            } else if (u.role === "KITCHEN") {
+                              roleBadge = "bg-burgundy/10 text-burgundy border-burgundy/30";
+                              roleIcon = <ChefHat className="w-3.5 h-3.5" />;
+                            } else if (u.role === "DELIVERY") {
+                              roleBadge = "bg-violet-50 text-violet-700 border-violet-200";
+                              roleIcon = <Bike className="w-3.5 h-3.5" />;
+                            }
+
+                            return (
+                              <tr key={u.id} className="hover:bg-ivory/10 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-full bg-gold/15 text-maroon font-bold flex items-center justify-center border border-gold/10 shrink-0">
+                                      {u.name.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-maroon">{u.name}</p>
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-maroon/50 font-medium mt-0.5">
+                                        <span className="flex items-center gap-1">
+                                          <Mail className="w-3 h-3 text-maroon/30" />
+                                          {u.email}
+                                        </span>
+                                        {u.phone && (
+                                          <span className="flex items-center gap-1">
+                                            <Phone className="w-3 h-3 text-maroon/30" />
+                                            {u.phone}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border w-fit", roleBadge)}>
+                                    {roleIcon}
+                                    <span>{u.role}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <button
+                                    onClick={() => handleUpdateUserStatus(u.id, !u.isActive)}
+                                    className={cn(
+                                      "px-3 py-1 rounded-full text-xs font-bold border transition-all active:scale-95",
+                                      u.isActive
+                                        ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                                        : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                                    )}
+                                  >
+                                    {u.isActive ? "Active" : "Disabled"}
+                                  </button>
+                                </td>
+                                <td className="px-6 py-4 text-maroon/50 text-xs font-medium">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3.5 h-3.5 text-maroon/30" />
+                                    {formatDate(u.createdAt)}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={u.role}
+                                    onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
+                                    className="bg-cream border border-ivory rounded-lg text-xs text-maroon font-bold p-1.5 focus:outline-none focus:border-gold"
+                                    disabled={u.email === appState.userEmail}
+                                  >
+                                    <option value="CUSTOMER">Customer</option>
+                                    <option value="KITCHEN">Kitchen Staff</option>
+                                    <option value="DELIVERY">Courier</option>
+                                    <option value="ADMIN">System Admin</option>
+                                  </select>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    {usersTotalPages > 1 && (
+                      <div className="px-6 py-4 border-t border-ivory flex justify-between items-center bg-cream/30">
+                        <button
+                          onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                          disabled={usersPage === 1}
+                          className="px-4 py-2 border border-ivory bg-white rounded-xl text-xs font-bold text-maroon disabled:opacity-50 hover:bg-ivory/20 transition-all"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-xs text-maroon/50 font-bold">
+                          Page {usersPage} of {usersTotalPages}
+                        </span>
+                        <button
+                          onClick={() => setUsersPage((p) => Math.min(usersTotalPages, p + 1))}
+                          disabled={usersPage === usersTotalPages}
+                          className="px-4 py-2 border border-ivory bg-white rounded-xl text-xs font-bold text-maroon disabled:opacity-50 hover:bg-ivory/20 transition-all"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -829,6 +1117,148 @@ export default function AdminApp() {
           )}
         </div>
       </main>
+
+      {/* Create User Modal */}
+      {isCreateUserModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-ivory overflow-hidden transform animate-scale-in">
+            {/* Modal Header */}
+            <div className="bg-maroon text-cream px-6 py-5 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg text-gold font-display">Add User Account</h3>
+                <p className="text-xs text-cream/70 mt-0.5">Register customers or staff members directly</p>
+              </div>
+              <button
+                onClick={() => setIsCreateUserModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-cream hover:bg-white/20 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleCreateUserSubmit} className="p-6 space-y-4">
+              {createUserError && (
+                <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold">
+                  ⚠️ {createUserError}
+                </div>
+              )}
+
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-maroon/30 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    required
+                    type="text"
+                    value={createUserForm.name}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, name: e.target.value })}
+                    className="w-full bg-cream border border-ivory rounded-xl pl-10 pr-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                    placeholder="Enter full name"
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Email Address</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-maroon/30 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    required
+                    type="email"
+                    value={createUserForm.email}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                    className="w-full bg-cream border border-ivory rounded-xl pl-10 pr-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                    placeholder="Enter email address"
+                  />
+                </div>
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Phone Number (Optional)</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-maroon/30 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={createUserForm.phone}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, phone: e.target.value })}
+                    className="w-full bg-cream border border-ivory rounded-xl pl-10 pr-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                    placeholder="+919876543210"
+                  />
+                </div>
+              </div>
+
+              {/* Role Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">System Role</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "CUSTOMER", label: "Customer" },
+                    { id: "KITCHEN", label: "Kitchen Staff" },
+                    { id: "DELIVERY", label: "Courier/Driver" },
+                    { id: "ADMIN", label: "Admin" },
+                  ].map((role) => (
+                    <button
+                      key={role.id}
+                      type="button"
+                      onClick={() => setCreateUserForm({ ...createUserForm, role: role.id })}
+                      className={cn(
+                        "py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center",
+                        createUserForm.role === role.id
+                          ? "bg-maroon text-cream border-maroon shadow-inner"
+                          : "bg-cream text-maroon/65 border-ivory hover:bg-ivory/50"
+                      )}
+                    >
+                      {role.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-maroon/30 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    required
+                    type="password"
+                    value={createUserForm.password}
+                    onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                    className="w-full bg-cream border border-ivory rounded-xl pl-10 pr-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                    placeholder="Minimum 8 characters"
+                  />
+                </div>
+              </div>
+
+              {/* Form Buttons */}
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateUserModalOpen(false)}
+                  className="flex-1 py-3 border border-ivory rounded-xl text-xs font-bold text-maroon hover:bg-cream/50 transition-all text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingUser}
+                  className="flex-1 py-3 bg-maroon text-cream rounded-xl text-xs font-bold hover:bg-burgundy transition-all text-center disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  {isCreatingUser ? (
+                    <div className="w-4 h-4 border-2 border-cream border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    "Create Account"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

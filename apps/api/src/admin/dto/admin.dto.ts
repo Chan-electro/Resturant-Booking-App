@@ -6,6 +6,8 @@ import {
   IsOptional,
   IsString,
   Min,
+  IsEmail,
+  MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -116,4 +118,28 @@ export class UpdateCouponDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+export class CreateUserDto {
+  @ApiProperty({ example: 'Chef John' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ example: 'chef@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: 'SecurePass@123', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @ApiPropertyOptional({ example: '+919876543210' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiProperty({ enum: ['CUSTOMER', 'KITCHEN', 'DELIVERY', 'ADMIN'] })
+  @IsEnum(['CUSTOMER', 'KITCHEN', 'DELIVERY', 'ADMIN'])
+  role: string;
 }
