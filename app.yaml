@@ -16,7 +16,7 @@ services:
     envs:
       - key: DATABASE_URL
         scope: RUN_AND_BUILD_TIME
-        value: ${db.DATABASE_URL}&schema=app_schema
+        type: SECRET
       - key: JWT_SECRET
         scope: RUN_TIME
         value: Vt/rxU3v09YjRT5mEqmaoy/n17jcDTVHzRJ+OXeGMA0=
@@ -35,6 +35,15 @@ services:
       - key: FRONTEND_URL
         scope: RUN_TIME
         value: ${web.PUBLIC_URL}
+      - key: GOOGLE_CLIENT_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: GOOGLE_CLIENT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: GOOGLE_CALLBACK_URL
+        scope: RUN_TIME
+        value: ${api.PUBLIC_URL}/api/v1/auth/google/callback
 
   - name: web
     environment_slug: node-js
@@ -72,7 +81,7 @@ jobs:
     envs:
       - key: DATABASE_URL
         scope: RUN_AND_BUILD_TIME
-        value: ${db.DATABASE_URL}&schema=app_schema
+        type: SECRET
 
 databases:
   - engine: PG
