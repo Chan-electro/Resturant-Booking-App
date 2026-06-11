@@ -136,6 +136,15 @@ export const ordersApi = {
   updateStatus: (id: string, status: string, note?: string) =>
     request(`/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) }),
 
+  verifyPayment: (
+    orderId: string,
+    data: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }
+  ) =>
+    request(`/orders/${orderId}/verify-payment`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   kitchenQueue: () => request("/kitchen/orders"),
 
   productionSummary: () => request("/kitchen/production"),

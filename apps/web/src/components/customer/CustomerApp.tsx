@@ -142,6 +142,70 @@ export default function CustomerApp() {
     cart.addItem({ menuItem: item, quantity: 1 });
   };
 
+  const loadRazorpayScript = () => {
+    return new Promise<boolean>((resolve) => {
+      if (typeof window !== "undefined" && (window as any).Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handleRazorpayPayment = async (orderId: string, razorpayData: any) => {
+    const loaded = await loadRazorpayScript();
+    if (!loaded) {
+      alert("Failed to load Razorpay SDK. Please check your internet connection.");
+      return;
+    }
+
+    const options = {
+      key: razorpayData.key,
+      amount: razorpayData.amount,
+      currency: razorpayData.currency,
+      name: "Brahma Kalasha",
+      description: "Pre-order Vegetarian Meal",
+      order_id: razorpayData.id,
+      handler: async function (response: any) {
+        try {
+          const verifyRes = await ordersApi.verifyPayment(orderId, {
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature || "",
+          });
+          if (verifyRes.success) {
+            setView("success");
+          } else {
+            alert("Payment verification failed: " + (verifyRes.error || "Unknown error"));
+          }
+        } catch (err) {
+          console.error("Payment verification failed:", err);
+          alert("Failed to verify payment with server.");
+        }
+      },
+      prefill: {
+        name: name,
+        contact: phone,
+      },
+      theme: {
+        color: "#4B0F16",
+      },
+      modal: {
+        ondismiss: function () {
+          alert("Payment cancelled. You can complete/view your order in My Orders.");
+          setView("orders");
+        },
+      },
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
+  };
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -184,14 +248,21 @@ export default function CustomerApp() {
 
       if (orderRes.success && orderRes.data) {
         cart.clearCart();
-        const rawOrder = orderRes.data as any;
+        const rawOrder = (orderRes.data as any).order || orderRes.data;
+        const razorpayData = (orderRes.data as any).razorpay;
+
         setLastPlacedOrder({
           ...rawOrder,
           status: rawOrder.status.toLowerCase() as OrderStatus,
           paymentMethod: rawOrder.paymentMethod.toLowerCase() as PaymentMethod,
           paymentStatus: rawOrder.paymentStatus.toLowerCase() as PaymentStatus,
         });
-        setView("success");
+
+        if (payment === "online" && razorpayData) {
+          await handleRazorpayPayment(rawOrder.id, razorpayData);
+        } else {
+          setView("success");
+        }
       } else {
         alert("Failed to place order: " + (orderRes.error || "Unknown error"));
       }
@@ -269,7 +340,7 @@ export default function CustomerApp() {
   if (view === "orders") {
     return (
       <div className="w-full max-w-4xl mx-auto min-h-screen bg-cream pb-safe md:py-8 px-4">
-        <header className="bg-white p-4 rounded-b-2xl md:rounded-2xl sticky top-0 md:relative z-10 flex items-center gap-3 border border-ivory shadow-sm mb-6">
+        <header className="bg-white p-4 rounded-b-2xl md:rounded-2xl sticky top-0 md:relative z-30 flex items-center gap-3 border border-ivory shadow-sm mb-6">
           <button
             onClick={() => setView("menu")}
             className="w-10 h-10 rounded-full border border-ivory flex items-center justify-center hover:bg-cream transition-colors text-maroon"
@@ -353,7 +424,7 @@ export default function CustomerApp() {
   if (view === "cart" || view === "checkout") {
     return (
       <div className="w-full max-w-5xl mx-auto min-h-screen bg-cream pb-safe relative px-4 md:py-8">
-        <header className="bg-white p-4 rounded-b-2xl md:rounded-2xl sticky top-0 md:relative z-10 flex items-center justify-between border border-ivory shadow-sm mb-6">
+        <header className="bg-white p-4 rounded-b-2xl md:rounded-2xl sticky top-0 md:relative z-30 flex items-center justify-between border border-ivory shadow-sm mb-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setView("menu")}
@@ -613,7 +684,7 @@ export default function CustomerApp() {
   return (
     <div className="w-full min-h-screen bg-cream relative pb-24">
       {/* Header */}
-      <header className="bg-maroon text-cream px-6 pt-12 pb-14 rounded-b-[2rem] shadow-sm relative z-10 overflow-hidden max-w-md lg:max-w-6xl mx-auto lg:rounded-[2rem] lg:mt-6">
+      <header className="bg-maroon text-cream px-6 pt-12 pb-14 rounded-b-[2rem] shadow-sm relative z-30 overflow-hidden max-w-md lg:max-w-6xl mx-auto lg:rounded-[2rem] lg:mt-6">
         <div className="absolute -right-12 -top-12 w-48 h-48 bg-burgundy rounded-full blur-3xl opacity-50" />
         <div className="absolute top-1/2 left-0 w-32 h-32 bg-gold/20 rounded-full blur-3xl opacity-50" />
 

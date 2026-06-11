@@ -216,6 +216,60 @@ export class OrdersService {
       body: `Order #${orderNumber} confirmed`,
     });
 
+    // If ONLINE payment, create Razorpay order
+    if (dto.paymentMethod === 'ONLINE') {
+      const keyId = process.env.RAZORPAY_KEY_ID;
+      const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+      if (keyId && keySecret) {
+        try {
+          const authString = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+          const res = await fetch('https://api.razorpay.com/v1/orders', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Basic ${authString}`,
+            },
+            body: JSON.stringify({
+              amount: Math.round(order.total * 100), // amount in paise (1 INR = 100 paise)
+              currency: 'INR',
+              receipt: order.orderNumber,
+            }),
+          });
+
+          if (res.ok) {
+            const razorpayOrder = await res.json();
+            return {
+              order,
+              razorpay: {
+                id: razorpayOrder.id,
+                amount: razorpayOrder.amount,
+                currency: razorpayOrder.currency,
+                key: keyId,
+              },
+            };
+          } else {
+            const errData = await res.json();
+            console.error('Razorpay order creation failed:', errData);
+          }
+        } catch (err) {
+          console.error('Failed to create Razorpay order:', err);
+        }
+      }
+
+      // Fallback sandbox mock
+      console.warn('Razorpay keys not set or API failed. Returning mock Razorpay data.');
+      return {
+        order,
+        razorpay: {
+          id: `order_mock_${order.id}_${Date.now()}`,
+          amount: Math.round(order.total * 100),
+          currency: 'INR',
+          key: keyId || 'rzp_test_mockkey',
+        },
+      };
+    }
+
     return order;
   }
 
@@ -463,5 +517,70 @@ export class OrdersService {
         ...data,
       })),
     };
+  }
+
+  async verifyPayment(
+    userId: string,
+    orderId: string,
+    dto: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.userId !== userId) {
+      throw new ForbiddenException('You are not authorized to access this order');
+    }
+
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keyId = process.env.RAZORPAY_KEY_ID;
+
+    if (keyId && keySecret) {
+      const crypto = require('crypto');
+      const body = dto.razorpayOrderId + '|' + dto.razorpayPaymentId;
+      const expectedSignature = crypto
+        .createHmac('sha256', keySecret)
+        .update(body.toString())
+        .digest('hex');
+
+      if (expectedSignature !== dto.razorpaySignature) {
+        throw new BadRequestException('Invalid payment signature');
+      }
+    } else {
+      console.warn('Razorpay keys not configured. Skipping signature check (Sandbox/mock mode).');
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: 'PAID',
+        specialInstructions: order.specialInstructions
+          ? `${order.specialInstructions}\n[Paid via Razorpay. Order: ${dto.razorpayOrderId}, Payment: ${dto.razorpayPaymentId}]`
+          : `[Paid via Razorpay. Order: ${dto.razorpayOrderId}, Payment: ${dto.razorpayPaymentId}]`,
+        statusHistory: {
+          create: {
+            status: order.status,
+            changedBy: userId,
+            note: `Payment verified successfully. Razorpay ID: ${dto.razorpayPaymentId}`,
+          },
+        },
+      },
+      include: {
+        items: true,
+        address: true,
+        statusHistory: true,
+      },
+    });
+
+    this.gateway.emitNewOrder(updatedOrder);
+
+    return updatedOrder;
   }
 }

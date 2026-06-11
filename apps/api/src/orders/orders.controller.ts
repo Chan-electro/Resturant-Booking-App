@@ -112,6 +112,17 @@ export class OrdersController {
     return { success: true, data: order };
   }
 
+  @Post(':id/verify-payment')
+  @ApiOperation({ summary: 'Verify Razorpay payment signature' })
+  async verifyPayment(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ) {
+    const order = await this.ordersService.verifyPayment(user.id, id, dto);
+    return { success: true, data: order };
+  }
+
   @Patch(':id/status')
   @UseGuards(RolesGuard)
   @Roles('ADMIN', 'KITCHEN', 'DELIVERY')
