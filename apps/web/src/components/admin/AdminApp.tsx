@@ -167,14 +167,172 @@ export default function AdminApp() {
     }
   };
 
+  // Menu Management States
+  const [tomorrowItems, setTomorrowItems] = useState<any[]>([]);
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [itemForm, setItemForm] = useState({
+    name: "",
+    categoryId: "",
+    price: 0,
+    description: "",
+    imageUrl: "",
+    isHealthy: false,
+    nutritionInfo: "",
+    prepNotes: "",
+  });
+  const [itemFormError, setItemFormError] = useState("");
+  const [isSavingItem, setIsSavingItem] = useState(false);
+
+  // Set default category when categories are loaded
+  useEffect(() => {
+    if (categories.length > 0 && !itemForm.categoryId) {
+      setItemForm((prev) => ({ ...prev, categoryId: categories[0].id }));
+    }
+  }, [categories]);
+
+  const handleOpenAddItem = () => {
+    setEditingItem(null);
+    setItemForm({
+      name: "",
+      categoryId: categories[0]?.id || "",
+      price: 0,
+      description: "",
+      imageUrl: "",
+      isHealthy: false,
+      nutritionInfo: "",
+      prepNotes: "",
+    });
+    setItemFormError("");
+    setIsItemModalOpen(true);
+  };
+
+  const handleOpenEditItem = (item: MenuItem) => {
+    setEditingItem(item);
+    setItemForm({
+      name: item.name,
+      categoryId: item.categoryId,
+      price: item.price,
+      description: item.description,
+      imageUrl: item.imageUrl,
+      isHealthy: !!item.isHealthy,
+      nutritionInfo: item.nutritionInfo || "",
+      prepNotes: item.prepNotes || "",
+    });
+    setItemFormError("");
+    setIsItemModalOpen(true);
+  };
+
+  const handleItemSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setItemFormError("");
+    setIsSavingItem(true);
+    try {
+      const slug = itemForm.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+
+      const payload = {
+        ...itemForm,
+        slug,
+        price: Number(itemForm.price),
+      };
+
+      let res;
+      if (editingItem) {
+        res = await menuApi.updateItem(editingItem.id, payload);
+      } else {
+        res = await menuApi.createItem(payload);
+      }
+
+      if (res.success) {
+        setIsItemModalOpen(false);
+        setEditingItem(null);
+        setItemForm({
+          name: "",
+          categoryId: categories[0]?.id || "",
+          price: 0,
+          description: "",
+          imageUrl: "",
+          isHealthy: false,
+          nutritionInfo: "",
+          prepNotes: "",
+        });
+        fetchData();
+      } else {
+        setItemFormError(res.error || "Failed to save menu item");
+      }
+    } catch (err) {
+      console.error(err);
+      setItemFormError("An error occurred while saving the menu item.");
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!confirm("Are you sure you want to delete this menu item?")) return;
+    try {
+      const res = await menuApi.deleteItem(itemId);
+      if (res.success) {
+        fetchData();
+      } else {
+        alert(res.error || "Failed to delete menu item");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting menu item");
+    }
+  };
+
+  const handleToggleTomorrowMenu = async (item: MenuItem) => {
+    const existingEntry = tomorrowItems.find((t) => t.menuItemId === item.id);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowDateStr = tomorrowDate.toISOString().split("T")[0];
+
+    try {
+      if (existingEntry) {
+        const updatedStatus = !existingEntry.isAvailable;
+        const res = await menuApi.updateDailyMenu(existingEntry.id, {
+          isAvailable: updatedStatus,
+        });
+        if (res.success) {
+          setTomorrowItems((prev) =>
+            prev.map((t) => (t.id === existingEntry.id ? { ...t, isAvailable: updatedStatus } : t))
+          );
+        } else {
+          alert(res.error || "Failed to update tomorrow's menu");
+        }
+      } else {
+        const res = await menuApi.setDailyMenu({
+          date: tomorrowDateStr,
+          menuItemId: item.id,
+          availableQty: 100,
+          isAvailable: true,
+        });
+        if (res.success && res.data) {
+          setTomorrowItems((prev) => [...prev, res.data]);
+        } else {
+          alert(res.error || "Failed to add to tomorrow's menu");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating tomorrow's menu");
+    }
+  };
+
   const fetchData = async () => {
     try {
-      const [statsRes, catRes, menuRes, ordersRes, settingsRes] = await Promise.all([
+      const [statsRes, catRes, menuRes, ordersRes, settingsRes, dailyRes] = await Promise.all([
         analyticsApi.dashboard(),
         menuApi.categories(),
         menuApi.items(),
         ordersApi.adminList(1, 100),
         adminApi.settings(),
+        menuApi.daily(),
       ]);
 
       if (statsRes.success && statsRes.data) {
@@ -208,6 +366,9 @@ export default function AdminApp() {
           mappedSettings[s.key] = s.value;
         });
         setSettings((prev) => ({ ...prev, ...mappedSettings }));
+      }
+      if (dailyRes.success && dailyRes.data) {
+        setTomorrowItems((dailyRes.data as any).tomorrow?.items || []);
       }
     } catch (err) {
       console.error("Failed to load admin console data:", err);
@@ -535,7 +696,10 @@ export default function AdminApp() {
                   {menuItems.length} items across {categories.length}{" "}
                   categories
                 </p>
-                <button className="bg-maroon text-cream font-bold px-5 py-2.5 rounded-xl shadow-sm hover:bg-burgundy transition-colors flex items-center gap-2">
+                <button
+                  onClick={handleOpenAddItem}
+                  className="bg-maroon text-cream font-bold px-5 py-2.5 rounded-xl shadow-sm hover:bg-burgundy transition-all flex items-center gap-2 active:scale-95"
+                >
                   <Plus className="w-4 h-4" /> Add Item
                 </button>
               </div>
@@ -550,6 +714,7 @@ export default function AdminApp() {
                         <th className="px-6 py-4">Price</th>
                         <th className="px-6 py-4">Tags</th>
                         <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Tomorrow's Menu</th>
                         <th className="px-6 py-4">Actions</th>
                       </tr>
                     </thead>
@@ -613,11 +778,36 @@ export default function AdminApp() {
                             </span>
                           </td>
                           <td className="px-6 py-4">
+                            {(() => {
+                              const entry = tomorrowItems.find((t) => t.menuItemId === item.id);
+                              const active = entry ? entry.isAvailable : false;
+                              return (
+                                <button
+                                  onClick={() => handleToggleTomorrowMenu(item)}
+                                  className={cn(
+                                    "px-3 py-1 rounded-full text-xs font-bold border transition-all active:scale-95",
+                                    active
+                                      ? "bg-gold/15 text-gold border-gold/30 hover:bg-gold/25"
+                                      : "bg-cream text-maroon/50 border-ivory hover:bg-ivory/20"
+                                  )}
+                                >
+                                  {active ? "★ Scheduled" : "☆ Add"}
+                                </button>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-6 py-4">
                             <div className="flex gap-2">
-                              <button className="w-8 h-8 rounded-lg bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-gold hover:border-gold/30 transition-colors">
+                              <button
+                                onClick={() => handleOpenEditItem(item)}
+                                className="w-8 h-8 rounded-lg bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-gold hover:border-gold/30 transition-colors"
+                              >
                                 <Edit className="w-4 h-4" />
                               </button>
-                              <button className="w-8 h-8 rounded-lg bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-red-500 hover:border-red-200 transition-colors">
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="w-8 h-8 rounded-lg bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-red-500 hover:border-red-200 transition-colors"
+                              >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -1252,6 +1442,168 @@ export default function AdminApp() {
                     <div className="w-4 h-4 border-2 border-cream border-t-transparent rounded-full animate-spin" />
                   ) : (
                     "Create Account"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Menu Item Modal */}
+      {isItemModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-ivory overflow-hidden transform animate-scale-in">
+            {/* Modal Header */}
+            <div className="bg-maroon text-cream px-6 py-5 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg text-gold font-display">
+                  {editingItem ? "Edit Menu Item" : "Create Menu Item"}
+                </h3>
+                <p className="text-xs text-cream/70 mt-0.5">
+                  {editingItem ? "Update food detail details" : "Add a new dish to the system master menu"}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsItemModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-cream hover:bg-white/20 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleItemSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {itemFormError && (
+                <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 font-bold">
+                  ⚠️ {itemFormError}
+                </div>
+              )}
+
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Dish Name</label>
+                <input
+                  required
+                  type="text"
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                  placeholder="e.g. Masala Dosa"
+                />
+              </div>
+
+              {/* Category */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Category</label>
+                <select
+                  required
+                  value={itemForm.categoryId}
+                  onChange={(e) => setItemForm({ ...itemForm, categoryId: e.target.value })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                >
+                  <option value="" disabled>Select category</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Price (₹)</label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  value={itemForm.price || ""}
+                  onChange={(e) => setItemForm({ ...itemForm, price: Number(e.target.value) })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                  placeholder="e.g. 120"
+                />
+              </div>
+
+              {/* Image URL */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Image URL</label>
+                <input
+                  required
+                  type="text"
+                  value={itemForm.imageUrl}
+                  onChange={(e) => setItemForm({ ...itemForm, imageUrl: e.target.value })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                  placeholder="https://images.unsplash.com/..."
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Description</label>
+                <textarea
+                  required
+                  value={itemForm.description}
+                  onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-medium focus:outline-none focus:border-gold h-20 resize-none"
+                  placeholder="Describe the dish ingredients, taste..."
+                />
+              </div>
+
+              {/* Is Healthy Toggle */}
+              <div className="flex items-center justify-between p-3 bg-cream rounded-xl border border-ivory">
+                <div>
+                  <p className="text-xs font-bold text-maroon">Mark as Healthy</p>
+                  <p className="text-[10px] text-maroon/50 mt-0.5">Show a green healthy badge next to this item</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={itemForm.isHealthy}
+                  onChange={(e) => setItemForm({ ...itemForm, isHealthy: e.target.checked })}
+                  className="w-4 h-4 text-maroon accent-maroon focus:ring-0 focus:ring-offset-0 rounded border-ivory"
+                />
+              </div>
+
+              {/* Nutrition Info */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Nutrition Info (Optional)</label>
+                <input
+                  type="text"
+                  value={itemForm.nutritionInfo}
+                  onChange={(e) => setItemForm({ ...itemForm, nutritionInfo: e.target.value })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-medium focus:outline-none focus:border-gold"
+                  placeholder="e.g. 240 kcal, 6g Protein"
+                />
+              </div>
+
+              {/* Prep Notes */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-maroon/65 block">Prep Notes (Optional)</label>
+                <input
+                  type="text"
+                  value={itemForm.prepNotes}
+                  onChange={(e) => setItemForm({ ...itemForm, prepNotes: e.target.value })}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-2.5 text-sm text-maroon font-medium focus:outline-none focus:border-gold"
+                  placeholder="e.g. Contains dairy, prepared without onion"
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsItemModalOpen(false)}
+                  className="flex-1 py-3 border border-ivory rounded-xl text-xs font-bold text-maroon hover:bg-cream/50 transition-all text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingItem}
+                  className="flex-1 py-3 bg-maroon text-cream rounded-xl text-xs font-bold hover:bg-burgundy transition-all text-center disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  {isSavingItem ? (
+                    <div className="w-4 h-4 border-2 border-cream border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    "Save Item"
                   )}
                 </button>
               </div>

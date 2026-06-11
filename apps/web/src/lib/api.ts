@@ -89,6 +89,16 @@ export const menuApi = {
   },
   daily: (date?: string) => request(`/menu/daily${date ? `?date=${date}` : ""}`),
   item: (id: string) => request(`/menu/items/${id}`),
+  createItem: (data: object) =>
+    request("/menu/items", { method: "POST", body: JSON.stringify(data) }),
+  updateItem: (id: string, data: object) =>
+    request(`/menu/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteItem: (id: string) =>
+    request(`/menu/items/${id}`, { method: "DELETE" }),
+  setDailyMenu: (data: object) =>
+    request("/menu/daily", { method: "POST", body: JSON.stringify(data) }),
+  updateDailyMenu: (id: string, data: object) =>
+    request(`/menu/daily/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 };
 
 // ===================== CART =====================
