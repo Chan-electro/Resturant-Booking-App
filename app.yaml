@@ -11,6 +11,8 @@ services:
     build_command: npm run build
     run_command: node apps/api/dist/main
     http_port: 3001
+    routes:
+      - path: /api
     envs:
       - key: DATABASE_URL
         scope: RUN_AND_BUILD_TIME
@@ -44,6 +46,8 @@ services:
     build_command: npm run build
     run_command: npm run start --workspace=apps/web
     http_port: 3000
+    routes:
+      - path: /
     envs:
       - key: NEXT_PUBLIC_API_URL
         scope: RUN_AND_BUILD_TIME
