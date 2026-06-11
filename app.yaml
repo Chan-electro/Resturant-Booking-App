@@ -17,10 +17,10 @@ services:
         value: ${db.DATABASE_URL}
       - key: JWT_SECRET
         scope: RUN_TIME
-        value: change-me-to-a-very-long-secure-random-string
+        value: Vt/rxU3v09YjRT5mEqmaoy/n17jcDTVHzRJ+OXeGMA0=
       - key: JWT_REFRESH_SECRET
         scope: RUN_TIME
-        value: change-me-to-another-very-long-secure-random-string
+        value: dk/NC/xIA4MlAYWBkYYD0ryIuKwvWyXPzB4P+bQWY8U=
       - key: JWT_EXPIRES_IN
         scope: RUN_TIME
         value: 15m
@@ -32,7 +32,7 @@ services:
         value: "3001"
       - key: FRONTEND_URL
         scope: RUN_TIME
-        value: ${web.URL}
+        value: ${web.PUBLIC_URL}
 
   - name: web
     environment_slug: node-js
@@ -47,13 +47,13 @@ services:
     envs:
       - key: NEXT_PUBLIC_API_URL
         scope: RUN_AND_BUILD_TIME
-        value: ${api.URL}/api/v1
+        value: ${api.PUBLIC_URL}/api/v1
       - key: NEXTAUTH_URL
         scope: RUN_TIME
-        value: ${web.URL}
+        value: ${web.PUBLIC_URL}
       - key: NEXTAUTH_SECRET
         scope: RUN_TIME
-        value: change-me-to-a-very-long-secure-random-string
+        value: nAGyh/ThXL5MFJLwUIJ5ePLG84UkQz5AKg/FtP9H2ao=
 
 databases:
   - engine: PG
