@@ -477,7 +477,7 @@ export default function AdminApp() {
         {/* Top Bar */}
         <header className="bg-white border-b border-ivory p-4 lg:p-6 flex justify-between items-center sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-3 lg:hidden">
-            <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto" />
+            <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto brightness-0" />
             <h2 className="text-lg font-bold text-maroon font-display">
               {navItems.find((n) => n.id === activePage)?.label}
             </h2>

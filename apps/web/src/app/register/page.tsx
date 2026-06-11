@@ -65,7 +65,7 @@ export default function RegisterPage() {
           <img
             src="/logo.png"
             alt="Brahma Kalasha"
-            className="h-14 w-auto mx-auto mb-4 drop-shadow-sm"
+            className="h-14 w-auto mx-auto mb-4 drop-shadow-sm brightness-0"
           />
           <p className="text-maroon/55 font-medium text-sm">Create your account</p>
         </div>

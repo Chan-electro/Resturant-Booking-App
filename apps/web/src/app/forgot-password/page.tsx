@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
 
       <div className="relative z-10 w-full max-w-sm">
         <div className="text-center mb-10">
-          <img src="/logo.png" alt="Brahma Kalasha" className="h-16 w-auto mx-auto mb-4 drop-shadow-sm" />
+          <img src="/logo.png" alt="Brahma Kalasha" className="h-16 w-auto mx-auto mb-4 drop-shadow-sm brightness-0" />
           <p className="text-maroon/55 font-medium text-sm">Reset your password</p>
         </div>
 
