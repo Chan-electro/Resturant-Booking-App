@@ -1,0 +1,28 @@
+{
+  "name": "brahma-kalasha",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "dev:all": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "db:generate": "npm run generate --workspace=packages/prisma",
+    "db:push": "npm run push --workspace=packages/prisma",
+    "db:migrate": "npm run migrate --workspace=packages/prisma",
+    "db:seed": "npm run seed --workspace=packages/prisma",
+    "db:studio": "npm run studio --workspace=packages/prisma",
+    "api:install": "npm install --workspace=apps/api",
+    "api:build": "npm run build --workspace=apps/api",
+    "db:seed:api": "npm run db:seed --workspace=apps/api"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

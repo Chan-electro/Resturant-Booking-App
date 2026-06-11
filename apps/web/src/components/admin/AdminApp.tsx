@@ -1,0 +1,667 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Users,
+  TrendingUp,
+  ShoppingBag,
+  LayoutDashboard,
+  Utensils,
+  Settings,
+  BarChart3,
+  Package,
+  Clock,
+  ChevronDown,
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Filter,
+  Download,
+  Bell,
+  FileText,
+} from "lucide-react";
+import { useOrders } from "@/lib/store";
+import { mockDashboardStats, mockMenuItems, mockCategories, mockSettings } from "@/lib/mock-data";
+import { cn, formatPrice, getStatusLabel, getStatusColor, formatDate, formatTime } from "@/lib/utils";
+
+type AdminPage = "dashboard" | "menu" | "orders" | "customers" | "analytics" | "settings";
+
+export default function AdminApp() {
+  const { orders, updateStatus } = useOrders();
+  const [activePage, setActivePage] = useState<AdminPage>("dashboard");
+  const [searchQuery, setSearchQuery] = useState("");
+  const stats = mockDashboardStats;
+
+  const navItems = [
+    { id: "dashboard" as AdminPage, icon: LayoutDashboard, label: "Dashboard" },
+    { id: "menu" as AdminPage, icon: Utensils, label: "Menu" },
+    { id: "orders" as AdminPage, icon: ShoppingBag, label: "Orders" },
+    { id: "customers" as AdminPage, icon: Users, label: "Customers" },
+    { id: "analytics" as AdminPage, icon: BarChart3, label: "Analytics" },
+    { id: "settings" as AdminPage, icon: Settings, label: "Settings" },
+  ];
+
+  return (
+    <div className="flex min-h-screen bg-cream">
+      {/* Sidebar */}
+      <aside className="w-64 bg-maroon text-cream flex-col hidden lg:flex shrink-0 sticky top-0 h-screen">
+        <div className="p-6 border-b border-ivory/10">
+          <div className="flex items-center gap-2.5 mb-2">
+            <img src="/logo.png" alt="Brahma Kalasha" className="h-8 w-auto brightness-0 invert" />
+          </div>
+          <p className="text-sm text-gold/80 font-medium">Admin Console</p>
+        </div>
+
+        <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActivePage(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-6 py-3.5 text-sm font-medium transition-colors text-left",
+                activePage === item.id
+                  ? "bg-white/10 text-gold border-r-4 border-gold"
+                  : "text-cream/60 hover:text-cream hover:bg-white/5"
+              )}
+            >
+              <item.icon className="w-5 h-5" />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-ivory/10">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center text-sm font-bold">
+              A
+            </div>
+            <div>
+              <p className="text-sm font-bold text-cream">Admin</p>
+              <p className="text-xs text-cream/50">admin@brahmakalasha.in</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Nav */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-ivory z-30 px-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <div className="flex justify-around">
+          {navItems.slice(0, 5).map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActivePage(item.id)}
+              className={cn(
+                "flex flex-col items-center py-3 px-2 text-xs font-bold transition-colors",
+                activePage === item.id
+                  ? "text-maroon"
+                  : "text-maroon/40"
+              )}
+            >
+              <item.icon className="w-5 h-5 mb-1" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto bg-cream pb-20 lg:pb-0">
+        {/* Top Bar */}
+        <header className="bg-white border-b border-ivory p-4 lg:p-6 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+          <div className="flex items-center gap-3 lg:hidden">
+            <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto" />
+            <h2 className="text-lg font-bold text-maroon font-display">
+              {navItems.find((n) => n.id === activePage)?.label}
+            </h2>
+          </div>
+          <h2 className="text-2xl font-bold text-maroon hidden lg:block font-display">
+            {navItems.find((n) => n.id === activePage)?.label}
+          </h2>
+          <div className="flex items-center gap-3">
+            <div className="relative hidden md:block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-maroon/40" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-cream border border-ivory rounded-xl pl-10 pr-4 py-2.5 text-sm text-maroon font-medium placeholder-maroon/30 focus:outline-none focus:border-gold w-56"
+                placeholder="Search..."
+              />
+            </div>
+            <button className="w-10 h-10 rounded-xl bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-maroon transition-colors relative">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-gold rounded-full" />
+            </button>
+          </div>
+        </header>
+
+        <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+          {/* ==================== DASHBOARD ==================== */}
+          {activePage === "dashboard" && (
+            <div className="space-y-6 animate-fade-in">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-ivory">
+                  <div className="flex justify-between items-start mb-3">
+                    <p className="text-xs text-maroon/50 font-bold uppercase tracking-wider">
+                      Revenue (Week)
+                    </p>
+                    <div className="w-10 h-10 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-gold" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl lg:text-3xl font-bold text-maroon">
+                    {formatPrice(stats.totalRevenue)}
+                  </h3>
+                  <p className="text-sm text-green-600 font-medium bg-green-50 w-fit px-2 py-0.5 rounded-md mt-2">
+                    +12% from last week
+                  </p>
+                </div>
+
+                <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-ivory">
+                  <div className="flex justify-between items-start mb-3">
+                    <p className="text-xs text-maroon/50 font-bold uppercase tracking-wider">
+                      Total Orders
+                    </p>
+                    <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center">
+                      <ShoppingBag className="w-5 h-5 text-blue-600" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl lg:text-3xl font-bold text-maroon">
+                    {stats.totalOrders}
+                  </h3>
+                  <p className="text-sm text-maroon/50 mt-2">
+                    {stats.activeOrders} active now
+                  </p>
+                </div>
+
+                <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-ivory">
+                  <div className="flex justify-between items-start mb-3">
+                    <p className="text-xs text-maroon/50 font-bold uppercase tracking-wider">
+                      Customers
+                    </p>
+                    <div className="w-10 h-10 rounded-full bg-violet-50 border border-violet-100 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-violet-600" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl lg:text-3xl font-bold text-maroon">
+                    {stats.totalCustomers}
+                  </h3>
+                  <p className="text-sm text-maroon/50 mt-2">
+                    Avg. {formatPrice(stats.avgOrderValue)}/order
+                  </p>
+                </div>
+
+                <div className="bg-white p-5 lg:p-6 rounded-2xl shadow-sm border border-ivory">
+                  <div className="flex justify-between items-start mb-3">
+                    <p className="text-xs text-maroon/50 font-bold uppercase tracking-wider">
+                      Cutoff Time
+                    </p>
+                    <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-amber-600" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl lg:text-3xl font-bold text-maroon">
+                    9:00 PM
+                  </h3>
+                  <p className="text-sm text-maroon/50 mt-2">Tonight&apos;s deadline</p>
+                </div>
+              </div>
+
+              {/* Revenue Chart Placeholder */}
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-bold text-lg text-maroon">Revenue This Week</h3>
+                  <button className="text-sm font-bold text-gold bg-gold/10 px-3 py-1.5 rounded-lg border border-gold/20">
+                    View Report
+                  </button>
+                </div>
+                <div className="flex items-end gap-3 h-48">
+                  {stats.revenueByDay.map((day) => {
+                    const maxRevenue = Math.max(
+                      ...stats.revenueByDay.map((d) => d.revenue)
+                    );
+                    const heightPct = (day.revenue / maxRevenue) * 100;
+                    return (
+                      <div
+                        key={day.date}
+                        className="flex-1 flex flex-col items-center gap-2"
+                      >
+                        <span className="text-xs font-bold text-maroon/60">
+                          {formatPrice(day.revenue / 1000)}k
+                        </span>
+                        <div
+                          className="w-full bg-gradient-to-t from-maroon to-burgundy rounded-t-lg transition-all duration-500 hover:from-gold hover:to-gold-dark cursor-pointer relative group"
+                          style={{ height: `${heightPct}%` }}
+                        >
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-maroon text-cream text-xs px-2 py-1 rounded font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                            {day.orders} orders
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-maroon/50">
+                          {day.date}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Top Items + Recent Orders */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Items */}
+                <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6">
+                  <h3 className="font-bold text-lg text-maroon mb-4">
+                    Top Selling Items
+                  </h3>
+                  <div className="space-y-3">
+                    {stats.topItems.map((item, i) => (
+                      <div
+                        key={item.name}
+                        className="flex items-center gap-3 p-3 bg-cream rounded-xl border border-ivory/50"
+                      >
+                        <span className="w-8 h-8 rounded-lg bg-maroon text-cream font-bold text-sm flex items-center justify-center shadow-sm">
+                          {i + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-maroon text-sm truncate">
+                            {item.name}
+                          </p>
+                          <p className="text-xs text-maroon/50">
+                            {item.count} orders
+                          </p>
+                        </div>
+                        <span className="font-bold text-gold text-sm">
+                          {formatPrice(item.revenue)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recent Orders */}
+                <div className="bg-white rounded-2xl shadow-sm border border-ivory overflow-hidden">
+                  <div className="px-6 py-4 border-b border-ivory flex justify-between items-center bg-cream/50">
+                    <h3 className="font-bold text-lg text-maroon">Recent Orders</h3>
+                    <button
+                      onClick={() => setActivePage("orders")}
+                      className="text-sm font-bold text-gold"
+                    >
+                      View All →
+                    </button>
+                  </div>
+                  <div className="divide-y divide-ivory">
+                    {orders.slice(0, 5).map((order) => (
+                      <div
+                        key={order.id}
+                        className="px-6 py-4 flex justify-between items-center hover:bg-ivory/20 transition-colors"
+                      >
+                        <div>
+                          <p className="font-bold text-maroon text-sm">
+                            {order.orderNumber}
+                          </p>
+                          <p className="text-xs text-maroon/50 mt-0.5">
+                            {order.items.length} items · {formatPrice(order.total)}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border",
+                            getStatusColor(order.status)
+                          )}
+                        >
+                          {order.status.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== MENU MANAGEMENT ==================== */}
+          {activePage === "menu" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <p className="text-maroon/60 font-medium">
+                  {mockMenuItems.length} items across {mockCategories.length}{" "}
+                  categories
+                </p>
+                <button className="bg-maroon text-cream font-bold px-5 py-2.5 rounded-xl shadow-sm hover:bg-burgundy transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Add Item
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-cream text-maroon/60 text-xs font-bold uppercase tracking-wider border-b border-ivory">
+                      <tr>
+                        <th className="px-6 py-4">Item</th>
+                        <th className="px-6 py-4">Category</th>
+                        <th className="px-6 py-4">Price</th>
+                        <th className="px-6 py-4">Tags</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ivory text-sm">
+                      {mockMenuItems.map((item) => (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-ivory/20 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-lg bg-cream overflow-hidden shrink-0 border border-ivory/50">
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div>
+                                <p className="font-bold text-maroon">
+                                  {item.name}
+                                </p>
+                                {item.isHealthy && (
+                                  <span className="text-[10px] text-green-700 font-bold bg-green-50 px-1.5 py-0.5 rounded">
+                                    Healthy
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-maroon/70 font-medium">
+                            {mockCategories.find(
+                              (c) => c.id === item.categoryId
+                            )?.name || "—"}
+                          </td>
+                          <td className="px-6 py-4 font-bold text-maroon">
+                            {formatPrice(item.price)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1">
+                              {item.tags.slice(0, 2).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="text-[10px] bg-ivory font-bold text-maroon/60 px-2 py-0.5 rounded-md"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={cn(
+                                "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase",
+                                item.isActive
+                                  ? "bg-green-50 text-green-800 border border-green-200"
+                                  : "bg-red-50 text-red-800 border border-red-200"
+                              )}
+                            >
+                              {item.isActive ? "Active" : "Disabled"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex gap-2">
+                              <button className="w-8 h-8 rounded-lg bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-gold hover:border-gold/30 transition-colors">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button className="w-8 h-8 rounded-lg bg-cream border border-ivory flex items-center justify-center text-maroon/50 hover:text-red-500 hover:border-red-200 transition-colors">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== ORDERS ==================== */}
+          {activePage === "orders" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <p className="text-maroon/60 font-medium">
+                  {orders.length} total orders
+                </p>
+                <div className="flex gap-2">
+                  <button className="bg-white text-maroon font-bold px-4 py-2 rounded-xl border border-ivory shadow-sm hover:border-gold/30 flex items-center gap-2 text-sm">
+                    <Filter className="w-4 h-4" /> Filter
+                  </button>
+                  <button className="bg-white text-maroon font-bold px-4 py-2 rounded-xl border border-ivory shadow-sm hover:border-gold/30 flex items-center gap-2 text-sm">
+                    <Download className="w-4 h-4" /> Export
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-cream text-maroon/60 text-xs font-bold uppercase tracking-wider border-b border-ivory">
+                      <tr>
+                        <th className="px-6 py-4">Order ID</th>
+                        <th className="px-6 py-4">Items</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Total</th>
+                        <th className="px-6 py-4">Payment</th>
+                        <th className="px-6 py-4">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ivory text-sm">
+                      {orders.map((order) => (
+                        <tr
+                          key={order.id}
+                          className="hover:bg-ivory/20 transition-colors"
+                        >
+                          <td className="px-6 py-4 font-mono font-bold text-maroon">
+                            {order.orderNumber}
+                          </td>
+                          <td className="px-6 py-4 text-maroon/70 max-w-[200px] truncate">
+                            {order.items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={cn(
+                                "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border",
+                                getStatusColor(order.status)
+                              )}
+                            >
+                              {order.status.replace(/_/g, " ")}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-maroon">
+                            {formatPrice(order.total)}
+                          </td>
+                          <td className="px-6 py-4 text-maroon/70 font-medium">
+                            <span
+                              className={cn(
+                                "text-xs",
+                                order.paymentMethod === "cod"
+                                  ? "text-amber-700"
+                                  : "text-green-700"
+                              )}
+                            >
+                              {order.paymentMethod.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-maroon/50 text-xs">
+                            {formatDate(order.createdAt)}
+                            <br />
+                            {formatTime(order.createdAt)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== CUSTOMERS (Placeholder) ==================== */}
+          {activePage === "customers" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory p-12 text-center">
+                <Users className="w-16 h-16 mx-auto mb-4 text-ivory" />
+                <h3 className="text-xl font-bold text-maroon mb-2">
+                  Customer Management
+                </h3>
+                <p className="text-maroon/50 max-w-md mx-auto">
+                  View and manage customer accounts, order history, and
+                  preferences. This module will be fully functional once the
+                  backend API is connected.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== ANALYTICS (Placeholder) ==================== */}
+          {activePage === "analytics" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6">
+                  <h3 className="font-bold text-lg text-maroon mb-4">
+                    Orders by Status
+                  </h3>
+                  <div className="space-y-3">
+                    {stats.ordersByStatus.map((s) => {
+                      const maxCount = Math.max(
+                        ...stats.ordersByStatus.map((x) => x.count)
+                      );
+                      const widthPct = (s.count / maxCount) * 100;
+                      return (
+                        <div key={s.status} className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-maroon/60 w-32 truncate capitalize">
+                            {s.status.replace(/_/g, " ")}
+                          </span>
+                          <div className="flex-1 bg-cream rounded-full h-6 overflow-hidden border border-ivory/50">
+                            <div
+                              className="h-full bg-gradient-to-r from-maroon to-gold rounded-full transition-all duration-700 flex items-center justify-end pr-2"
+                              style={{ width: `${widthPct}%` }}
+                            >
+                              <span className="text-[10px] font-bold text-cream">
+                                {s.count}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6">
+                  <h3 className="font-bold text-lg text-maroon mb-4">
+                    Performance Metrics
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-cream rounded-xl border border-ivory">
+                      <p className="text-xs text-maroon/50 font-bold uppercase mb-1">
+                        Avg. Order Value
+                      </p>
+                      <p className="text-2xl font-bold text-maroon">
+                        {formatPrice(stats.avgOrderValue)}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-cream rounded-xl border border-ivory">
+                      <p className="text-xs text-maroon/50 font-bold uppercase mb-1">
+                        Order Completion Rate
+                      </p>
+                      <p className="text-2xl font-bold text-maroon">96.2%</p>
+                    </div>
+                    <div className="p-4 bg-cream rounded-xl border border-ivory">
+                      <p className="text-xs text-maroon/50 font-bold uppercase mb-1">
+                        Customer Satisfaction
+                      </p>
+                      <p className="text-2xl font-bold text-maroon">4.7 / 5.0</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================== SETTINGS ==================== */}
+          {activePage === "settings" && (
+            <div className="space-y-6 animate-fade-in max-w-2xl">
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6 space-y-5">
+                <h3 className="font-bold text-lg text-maroon">
+                  Platform Settings
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                    <div>
+                      <p className="font-bold text-maroon">Booking Cutoff Time</p>
+                      <p className="text-sm text-maroon/50">
+                        Orders close at this time each day
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white border border-ivory rounded-xl px-4 py-2.5 shadow-sm">
+                      <Clock className="w-4 h-4 text-gold" />
+                      <span className="font-bold text-maroon">
+                        {mockSettings.cutoffTime}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                    <div>
+                      <p className="font-bold text-maroon">Tax Rate</p>
+                      <p className="text-sm text-maroon/50">
+                        Applied to all orders
+                      </p>
+                    </div>
+                    <span className="font-bold text-maroon bg-white border border-ivory rounded-xl px-4 py-2.5 shadow-sm">
+                      {mockSettings.taxRate}%
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                    <div>
+                      <p className="font-bold text-maroon">
+                        Free Delivery Minimum
+                      </p>
+                      <p className="text-sm text-maroon/50">
+                        Orders above this get free delivery
+                      </p>
+                    </div>
+                    <span className="font-bold text-maroon bg-white border border-ivory rounded-xl px-4 py-2.5 shadow-sm">
+                      {formatPrice(mockSettings.freeDeliveryMinimum)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                    <div>
+                      <p className="font-bold text-maroon">Service Zones</p>
+                      <p className="text-sm text-maroon/50">
+                        Currently delivering to
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {mockSettings.serviceZones.map((zone) => (
+                        <span
+                          key={zone}
+                          className="font-bold text-maroon bg-white border border-ivory rounded-xl px-3 py-2 shadow-sm text-sm"
+                        >
+                          {zone}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

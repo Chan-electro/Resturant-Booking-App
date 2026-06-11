@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: brahma-kalasha-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: brahma
+      POSTGRES_PASSWORD: brahma123
+      POSTGRES_DB: brahmakalasha
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brahma -d brahmakalasha"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: brahma-kalasha-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://brahma:brahma123@db:5432/brahmakalasha
+      JWT_SECRET: brahma-kalasha-secret-change-in-production
+      JWT_REFRESH_SECRET: brahma-kalasha-refresh-secret-change-in-production
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 3001
+      FRONTEND_URL: http://localhost:3000
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
