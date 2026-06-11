@@ -68,21 +68,6 @@ services:
         scope: RUN_TIME
         value: nAGyh/ThXL5MFJLwUIJ5ePLG84UkQz5AKg/FtP9H2ao=
 
-jobs:
-  - name: db-migrate
-    environment_slug: node-js
-    github:
-      branch: main
-      deploy_on_push: true
-      repo: Chan-electro/Resturant-Booking-App
-    source_dir: /
-    build_command: npm run db:generate
-    run_command: npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && npx tsx apps/api/prisma/seed.ts
-    envs:
-      - key: DATABASE_URL
-        scope: RUN_AND_BUILD_TIME
-        type: SECRET
-
 databases:
   - engine: PG
     name: db
