@@ -684,9 +684,13 @@ export default function CustomerApp() {
   return (
     <div className="w-full min-h-screen bg-cream relative pb-24">
       {/* Header */}
-      <header className="bg-maroon text-cream px-6 pt-12 pb-14 rounded-b-[2rem] shadow-sm relative z-30 overflow-hidden max-w-md lg:max-w-6xl mx-auto lg:rounded-[2rem] lg:mt-6">
-        <div className="absolute -right-12 -top-12 w-48 h-48 bg-burgundy rounded-full blur-3xl opacity-50" />
-        <div className="absolute top-1/2 left-0 w-32 h-32 bg-gold/20 rounded-full blur-3xl opacity-50" />
+      <header className="text-cream px-6 pt-12 pb-14 shadow-sm relative z-30 overflow-visible max-w-md lg:max-w-6xl mx-auto lg:mt-6">
+        {/* Background rounded wrapper to clip blur circles */}
+        <div className="absolute inset-0 bg-maroon rounded-b-[2rem] lg:rounded-[2rem] overflow-hidden pointer-events-none" />
+        <div className="absolute inset-0 overflow-hidden rounded-b-[2rem] lg:rounded-[2rem] pointer-events-none">
+          <div className="absolute -right-12 -top-12 w-48 h-48 bg-burgundy rounded-full blur-3xl opacity-50" />
+          <div className="absolute top-1/2 left-0 w-32 h-32 bg-gold/20 rounded-full blur-3xl opacity-50" />
+        </div>
 
         <div className="flex justify-between items-center mb-8 relative z-10">
           <img

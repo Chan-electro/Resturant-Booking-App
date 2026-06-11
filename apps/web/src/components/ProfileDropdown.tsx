@@ -138,31 +138,33 @@ export default function ProfileDropdown({
             </div>
           </div>
 
-          {/* Switch Roles Section */}
-          <div className="py-2 border-b border-ivory/50">
-            <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-maroon/40">
-              Switch Workspace
-            </p>
-            <div className="space-y-0.5 px-1.5">
-              {(["customer", "kitchen", "delivery", "admin"] as UserRole[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => handleRoleSelect(r)}
-                  className={cn(
-                    "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl transition-all text-left",
-                    state.currentRole === r
-                      ? "bg-cream text-gold"
-                      : "text-maroon/65 hover:bg-cream/50 hover:text-maroon"
-                  )}
-                >
-                  <span className={cn("text-maroon/40", state.currentRole === r && "text-gold")}>
-                    {getRoleIcon(r)}
-                  </span>
-                  <span>{getRoleLabel(r)}</span>
-                </button>
-              ))}
+          {/* Switch Roles Section - Dev Only */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="py-2 border-b border-ivory/50">
+              <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-wider text-maroon/40">
+                Switch Workspace (Dev Only)
+              </p>
+              <div className="space-y-0.5 px-1.5">
+                {(["customer", "kitchen", "delivery", "admin"] as UserRole[]).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => handleRoleSelect(r)}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl transition-all text-left",
+                      state.currentRole === r
+                        ? "bg-cream text-gold"
+                        : "text-maroon/65 hover:bg-cream/50 hover:text-maroon"
+                    )}
+                  >
+                    <span className={cn("text-maroon/40", state.currentRole === r && "text-gold")}>
+                      {getRoleIcon(r)}
+                    </span>
+                    <span>{getRoleLabel(r)}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* General Actions */}
           <div className="py-1 px-1.5">
