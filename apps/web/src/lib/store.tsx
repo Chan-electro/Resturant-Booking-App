@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useReducer, type ReactNode } from "react";
 import type { CartItem, Order, OrderStatus, UserRole } from "@/lib/types";
-import { mockOrders } from "@/lib/mock-data";
 
 // ===================== STATE =====================
 
@@ -12,12 +11,14 @@ interface AppState {
   currentRole: UserRole | null;
   isAuthenticated: boolean;
   userName: string;
+  userEmail?: string;
 }
 
 // ===================== ACTIONS =====================
 
 type Action =
   | { type: "SET_ROLE"; payload: UserRole | null }
+  | { type: "SET_USER"; payload: { name: string; email?: string } }
   | { type: "ADD_TO_CART"; payload: CartItem }
   | { type: "REMOVE_FROM_CART"; payload: string }
   | { type: "UPDATE_CART_QTY"; payload: { menuItemId: string; quantity: number } }
@@ -29,10 +30,11 @@ type Action =
 
 const initialState: AppState = {
   cart: [],
-  orders: mockOrders,
+  orders: [],
   currentRole: null,
   isAuthenticated: false,
   userName: "Guest",
+  userEmail: "",
 };
 
 // ===================== REDUCER =====================
@@ -41,6 +43,14 @@ function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "SET_ROLE":
       return { ...state, currentRole: action.payload };
+
+    case "SET_USER":
+      return {
+        ...state,
+        userName: action.payload.name,
+        userEmail: action.payload.email,
+        isAuthenticated: true,
+      };
 
     case "ADD_TO_CART": {
       const existing = state.cart.find(

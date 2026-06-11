@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Play,
   Check,
@@ -8,20 +8,48 @@ import {
   ChefHat,
   ShoppingBag,
   Search,
-  Filter,
   Printer,
   AlertCircle,
 } from "lucide-react";
-import { useOrders } from "@/lib/store";
-import type { OrderStatus } from "@/lib/types";
+import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
 import { cn, formatTime, getStatusLabel } from "@/lib/utils";
+import { ordersApi } from "@/lib/api";
+import ProfileDropdown from "@/components/ProfileDropdown";
 
 type KitchenFilter = "all" | "pending" | "preparing" | "ready";
 
 export default function KitchenApp() {
-  const { orders, updateStatus } = useOrders();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<KitchenFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchQueue = async () => {
+    try {
+      const res = await ordersApi.kitchenQueue();
+      if (res.success && res.data) {
+        const rawOrders = res.data as any[];
+        const mapped: Order[] = rawOrders.map((o) => ({
+          ...o,
+          status: o.status.toLowerCase() as OrderStatus,
+          paymentMethod: o.paymentMethod.toLowerCase() as PaymentMethod,
+          paymentStatus: o.paymentStatus.toLowerCase() as PaymentStatus,
+        }));
+        setOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch kitchen queue:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+    // Poll every 5 seconds for live orders
+    const interval = setInterval(fetchQueue, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Kitchen sees orders that are confirmed/placed, preparing, or ready
   const kitchenStatuses: OrderStatus[] = ["placed", "confirmed", "preparing", "ready"];
@@ -65,14 +93,25 @@ export default function KitchenApp() {
     ready: orders.filter((o) => o.status === "ready").length,
   };
 
-  const advanceStatus = (id: string, current: OrderStatus) => {
+  const advanceStatus = async (id: string, current: OrderStatus) => {
     const transitions: Record<string, OrderStatus> = {
       placed: "preparing",
       confirmed: "preparing",
       preparing: "ready",
     };
     const next = transitions[current];
-    if (next) updateStatus(id, next);
+    if (next) {
+      try {
+        const res = await ordersApi.updateStatus(id, next.toUpperCase());
+        if (res.success) {
+          fetchQueue();
+        } else {
+          alert("Failed to update status: " + (res.error || "Unknown error"));
+        }
+      } catch (err) {
+        console.error("Failed to update status:", err);
+      }
+    }
   };
 
   const getCardStyle = (status: OrderStatus) => {
@@ -139,6 +178,8 @@ export default function KitchenApp() {
                 </p>
               </div>
             </div>
+
+            <ProfileDropdown />
           </div>
         </div>
       </header>
@@ -287,14 +328,19 @@ export default function KitchenApp() {
               </div>
             </div>
           ))}
-          {kitchenOrders.length === 0 && (
+          {loading ? (
+            <div className="col-span-full py-16 text-center">
+              <div className="w-8 h-8 border-2 border-maroon border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-maroon/50 font-medium">Loading kitchen queue...</p>
+            </div>
+          ) : kitchenOrders.length === 0 ? (
             <div className="col-span-full py-16 text-center">
               <ChefHat className="w-16 h-16 mx-auto mb-4 text-ivory" />
               <p className="text-lg text-maroon/40 font-medium">
                 No active orders in the queue
               </p>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

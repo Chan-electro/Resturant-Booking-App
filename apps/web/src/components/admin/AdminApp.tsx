@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Users,
   TrendingUp,
   ShoppingBag,
   LayoutDashboard,
   Utensils,
-  Settings,
+  Settings as SettingsIcon,
   BarChart3,
   Package,
   Clock,
@@ -21,17 +21,120 @@ import {
   Bell,
   FileText,
 } from "lucide-react";
-import { useOrders } from "@/lib/store";
-import { mockDashboardStats, mockMenuItems, mockCategories, mockSettings } from "@/lib/mock-data";
-import { cn, formatPrice, getStatusLabel, getStatusColor, formatDate, formatTime } from "@/lib/utils";
+import type { Category, MenuItem, Order, OrderStatus, PaymentMethod, PaymentStatus, DashboardStats } from "@/lib/types";
+import { cn, formatPrice, getStatusColor, formatDate, formatTime } from "@/lib/utils";
+import { adminApi, analyticsApi, menuApi, ordersApi } from "@/lib/api";
+import ProfileDropdown from "@/components/ProfileDropdown";
+import { useApp } from "@/lib/store";
 
 type AdminPage = "dashboard" | "menu" | "orders" | "customers" | "analytics" | "settings";
 
 export default function AdminApp() {
-  const { orders, updateStatus } = useOrders();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    activeOrders: 0,
+    totalCustomers: 0,
+    avgOrderValue: 0,
+    topItems: [],
+    revenueByDay: [],
+    ordersByStatus: [],
+  });
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [settings, setSettings] = useState<Record<string, string>>({
+    cutoff_time: "21:00",
+    tax_rate: "5",
+    free_delivery_minimum: "200",
+    delivery_fee: "0",
+    service_zones: "Malleshwaram, Rajajinagar, Sadashivanagar",
+  });
+  const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState<AdminPage>("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
-  const stats = mockDashboardStats;
+  const [savingSettings, setSavingSettings] = useState(false);
+  const { state: appState } = useApp();
+
+  const fetchData = async () => {
+    try {
+      const [statsRes, catRes, menuRes, ordersRes, settingsRes] = await Promise.all([
+        analyticsApi.dashboard(),
+        menuApi.categories(),
+        menuApi.items(),
+        ordersApi.adminList(1, 100),
+        adminApi.settings(),
+      ]);
+
+      if (statsRes.success && statsRes.data) {
+        setStats(statsRes.data as DashboardStats);
+      }
+      if (catRes.success && catRes.data) {
+        setCategories(catRes.data as Category[]);
+      }
+      if (menuRes.success && menuRes.data) {
+        const rawItems = menuRes.data as any[];
+        const mappedItems: MenuItem[] = rawItems.map((item) => ({
+          ...item,
+          tags: item.tags ? item.tags.map((t: any) => t.tag?.name || t.tagId) : [],
+        }));
+        setMenuItems(mappedItems);
+      }
+      if (ordersRes.success && ordersRes.data) {
+        const rawOrders = ordersRes.data as any[];
+        const mappedOrders: Order[] = rawOrders.map((o) => ({
+          ...o,
+          status: o.status.toLowerCase() as OrderStatus,
+          paymentMethod: o.paymentMethod.toLowerCase() as PaymentMethod,
+          paymentStatus: o.paymentStatus.toLowerCase() as PaymentStatus,
+        }));
+        setOrders(mappedOrders);
+      }
+      if (settingsRes.success && settingsRes.data) {
+        const rawSettings = settingsRes.data as { key: string; value: string }[];
+        const mappedSettings: Record<string, string> = {};
+        rawSettings.forEach((s) => {
+          mappedSettings[s.key] = s.value;
+        });
+        setSettings((prev) => ({ ...prev, ...mappedSettings }));
+      }
+    } catch (err) {
+      console.error("Failed to load admin console data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSaveSetting = async (key: string, value: string) => {
+    try {
+      setSavingSettings(true);
+      const res = await adminApi.updateSetting(key, value);
+      if (res.success) {
+        // Refresh settings
+        const settingsRes = await adminApi.settings();
+        if (settingsRes.success && settingsRes.data) {
+          const rawSettings = settingsRes.data as { key: string; value: string }[];
+          const mappedSettings: Record<string, string> = {};
+          rawSettings.forEach((s) => {
+            mappedSettings[s.key] = s.value;
+          });
+          setSettings((prev) => ({ ...prev, ...mappedSettings }));
+        }
+        alert("Setting updated successfully!");
+      } else {
+        alert("Failed to update setting: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save setting");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const navItems = [
     { id: "dashboard" as AdminPage, icon: LayoutDashboard, label: "Dashboard" },
@@ -39,7 +142,7 @@ export default function AdminApp() {
     { id: "orders" as AdminPage, icon: ShoppingBag, label: "Orders" },
     { id: "customers" as AdminPage, icon: Users, label: "Customers" },
     { id: "analytics" as AdminPage, icon: BarChart3, label: "Analytics" },
-    { id: "settings" as AdminPage, icon: Settings, label: "Settings" },
+    { id: "settings" as AdminPage, icon: SettingsIcon, label: "Settings" },
   ];
 
   return (
@@ -72,15 +175,7 @@ export default function AdminApp() {
         </nav>
 
         <div className="p-4 border-t border-ivory/10">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-9 h-9 rounded-full bg-gold/20 flex items-center justify-center text-sm font-bold">
-              A
-            </div>
-            <div>
-              <p className="text-sm font-bold text-cream">Admin</p>
-              <p className="text-xs text-cream/50">admin@brahmakalasha.in</p>
-            </div>
-          </div>
+          <ProfileDropdown theme="light" onSettingsClick={() => setActivePage('settings')} />
         </div>
       </aside>
 
@@ -132,6 +227,7 @@ export default function AdminApp() {
               <Bell className="w-5 h-5" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-gold rounded-full" />
             </button>
+            <ProfileDropdown theme="dark" onSettingsClick={() => setActivePage('settings')} />
           </div>
         </header>
 
@@ -325,7 +421,7 @@ export default function AdminApp() {
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <p className="text-maroon/60 font-medium">
-                  {mockMenuItems.length} items across {mockCategories.length}{" "}
+                  {menuItems.length} items across {categories.length}{" "}
                   categories
                 </p>
                 <button className="bg-maroon text-cream font-bold px-5 py-2.5 rounded-xl shadow-sm hover:bg-burgundy transition-colors flex items-center gap-2">
@@ -347,7 +443,7 @@ export default function AdminApp() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ivory text-sm">
-                      {mockMenuItems.map((item) => (
+                      {menuItems.map((item) => (
                         <tr
                           key={item.id}
                           className="hover:bg-ivory/20 transition-colors"
@@ -374,7 +470,7 @@ export default function AdminApp() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-maroon/70 font-medium">
-                            {mockCategories.find(
+                            {categories.find(
                               (c) => c.id === item.categoryId
                             )?.name || "—"}
                           </td>
@@ -591,71 +687,142 @@ export default function AdminApp() {
           {/* ==================== SETTINGS ==================== */}
           {activePage === "settings" && (
             <div className="space-y-6 animate-fade-in max-w-2xl">
-              <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6 space-y-5">
-                <h3 className="font-bold text-lg text-maroon">
-                  Platform Settings
-                </h3>
+              <div className="bg-white rounded-2xl shadow-sm border border-ivory p-6 space-y-6">
+                <div className="flex justify-between items-center border-b border-ivory/50 pb-4">
+                  <h3 className="font-bold text-lg text-maroon">
+                    Platform Settings
+                  </h3>
+                  {savingSettings && (
+                    <div className="text-xs text-gold font-bold animate-pulse">Saving changes...</div>
+                  )}
+                </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                <div className="space-y-5">
+                  {/* Cutoff Time */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-cream rounded-xl border border-ivory">
                     <div>
                       <p className="font-bold text-maroon">Booking Cutoff Time</p>
                       <p className="text-sm text-maroon/50">
                         Orders close at this time each day
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 bg-white border border-ivory rounded-xl px-4 py-2.5 shadow-sm">
-                      <Clock className="w-4 h-4 text-gold" />
-                      <span className="font-bold text-maroon">
-                        {mockSettings.cutoffTime}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={settings.cutoff_time || ""}
+                        onChange={(e) => setSettings({ ...settings, cutoff_time: e.target.value })}
+                        className="bg-white border border-ivory rounded-xl px-4 py-2 text-sm text-maroon font-bold w-24 focus:outline-none focus:border-gold"
+                        placeholder="21:00"
+                      />
+                      <button
+                        onClick={() => handleSaveSetting("cutoff_time", settings.cutoff_time)}
+                        className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all"
+                      >
+                        Save
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                  {/* Tax Rate */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-cream rounded-xl border border-ivory">
                     <div>
-                      <p className="font-bold text-maroon">Tax Rate</p>
+                      <p className="font-bold text-maroon">Tax Rate (%)</p>
                       <p className="text-sm text-maroon/50">
                         Applied to all orders
                       </p>
                     </div>
-                    <span className="font-bold text-maroon bg-white border border-ivory rounded-xl px-4 py-2.5 shadow-sm">
-                      {mockSettings.taxRate}%
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={settings.tax_rate || ""}
+                        onChange={(e) => setSettings({ ...settings, tax_rate: e.target.value })}
+                        className="bg-white border border-ivory rounded-xl px-4 py-2 text-sm text-maroon font-bold w-24 focus:outline-none focus:border-gold"
+                        placeholder="5"
+                      />
+                      <button
+                        onClick={() => handleSaveSetting("tax_rate", settings.tax_rate)}
+                        className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all"
+                      >
+                        Save
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                  {/* Free Delivery Minimum */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-cream rounded-xl border border-ivory">
                     <div>
-                      <p className="font-bold text-maroon">
-                        Free Delivery Minimum
-                      </p>
+                      <p className="font-bold text-maroon">Free Delivery Minimum (₹)</p>
                       <p className="text-sm text-maroon/50">
                         Orders above this get free delivery
                       </p>
                     </div>
-                    <span className="font-bold text-maroon bg-white border border-ivory rounded-xl px-4 py-2.5 shadow-sm">
-                      {formatPrice(mockSettings.freeDeliveryMinimum)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={settings.free_delivery_minimum || ""}
+                        onChange={(e) => setSettings({ ...settings, free_delivery_minimum: e.target.value })}
+                        className="bg-white border border-ivory rounded-xl px-4 py-2 text-sm text-maroon font-bold w-24 focus:outline-none focus:border-gold"
+                        placeholder="200"
+                      />
+                      <button
+                        onClick={() => handleSaveSetting("free_delivery_minimum", settings.free_delivery_minimum)}
+                        className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all"
+                      >
+                        Save
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex justify-between items-center p-4 bg-cream rounded-xl border border-ivory">
+                  {/* Delivery Fee */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-cream rounded-xl border border-ivory">
+                    <div>
+                      <p className="font-bold text-maroon">Standard Delivery Fee (₹)</p>
+                      <p className="text-sm text-maroon/50">
+                        Fee for orders below the free delivery minimum
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={settings.delivery_fee || ""}
+                        onChange={(e) => setSettings({ ...settings, delivery_fee: e.target.value })}
+                        className="bg-white border border-ivory rounded-xl px-4 py-2 text-sm text-maroon font-bold w-24 focus:outline-none focus:border-gold"
+                        placeholder="30"
+                      />
+                      <button
+                        onClick={() => handleSaveSetting("delivery_fee", settings.delivery_fee)}
+                        className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Service Zones */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-cream rounded-xl border border-ivory">
                     <div>
                       <p className="font-bold text-maroon">Service Zones</p>
                       <p className="text-sm text-maroon/50">
-                        Currently delivering to
+                        Commas-separated list of delivery regions
                       </p>
                     </div>
-                    <div className="flex gap-2">
-                      {mockSettings.serviceZones.map((zone) => (
-                        <span
-                          key={zone}
-                          className="font-bold text-maroon bg-white border border-ivory rounded-xl px-3 py-2 shadow-sm text-sm"
-                        >
-                          {zone}
-                        </span>
-                      ))}
+                    <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+                      <input
+                        type="text"
+                        value={settings.service_zones || ""}
+                        onChange={(e) => setSettings({ ...settings, service_zones: e.target.value })}
+                        className="bg-white border border-ivory rounded-xl px-4 py-2 text-sm text-maroon font-bold flex-1 focus:outline-none focus:border-gold"
+                        placeholder="Malleshwaram, Rajajinagar"
+                      />
+                      <button
+                        onClick={() => handleSaveSetting("service_zones", settings.service_zones)}
+                        className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all shrink-0"
+                      >
+                        Save
+                      </button>
                     </div>
                   </div>
+
                 </div>
               </div>
             </div>

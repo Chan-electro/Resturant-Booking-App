@@ -108,6 +108,16 @@ export const ordersApi = {
   list: (page = 1, pageSize = 10) =>
     request(`/orders?page=${page}&pageSize=${pageSize}`),
 
+  adminList: (page = 1, pageSize = 20, status?: string, date?: string) => {
+    const qs = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      ...(status && { status }),
+      ...(date && { date }),
+    }).toString();
+    return request(`/orders/admin?${qs}`);
+  },
+
   get: (id: string) => request(`/orders/${id}`),
 
   cancel: (id: string) => request(`/orders/${id}/cancel`, { method: "POST" }),

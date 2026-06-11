@@ -10,16 +10,45 @@ import {
   Clock,
   History,
 } from "lucide-react";
-import { useOrders } from "@/lib/store";
-import { useState } from "react";
-import type { OrderStatus } from "@/lib/types";
-import { cn, formatPrice, formatTime, getStatusLabel, getDeliveryDateLabel } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
+import { cn, formatPrice, formatTime, getStatusLabel } from "@/lib/utils";
+import { ordersApi } from "@/lib/api";
+import ProfileDropdown from "@/components/ProfileDropdown";
 
 type DeliveryTab = "active" | "history";
 
 export default function DeliveryApp() {
-  const { orders, updateStatus } = useOrders();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<DeliveryTab>("active");
+
+  const fetchAssignments = async () => {
+    try {
+      const res = await ordersApi.deliveryAssignments();
+      if (res.success && res.data) {
+        const rawOrders = res.data as any[];
+        const mapped: Order[] = rawOrders.map((o) => ({
+          ...o,
+          status: o.status.toLowerCase() as OrderStatus,
+          paymentMethod: o.paymentMethod.toLowerCase() as PaymentMethod,
+          paymentStatus: o.paymentStatus.toLowerCase() as PaymentStatus,
+        }));
+        setOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch assignments:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignments();
+    // Poll every 5 seconds for live assignments
+    const interval = setInterval(fetchAssignments, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Active deliveries: ready or out_for_delivery
   const activeDeliveries = orders
@@ -31,13 +60,26 @@ export default function DeliveryApp() {
     .filter((o) => o.status === "delivered" || o.status === "completed")
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
-  const advanceStatus = (id: string, current: OrderStatus) => {
-    const transitions: Record<string, OrderStatus> = {
-      ready: "out_for_delivery",
-      out_for_delivery: "delivered",
-    };
-    const next = transitions[current];
-    if (next) updateStatus(id, next);
+  const advanceStatus = async (id: string, current: OrderStatus) => {
+    try {
+      if (current === "ready") {
+        const res = await ordersApi.confirmPickup(id);
+        if (res.success) {
+          fetchAssignments();
+        } else {
+          alert("Failed to confirm pickup: " + (res.error || "Unknown error"));
+        }
+      } else if (current === "out_for_delivery") {
+        const res = await ordersApi.confirmDelivery(id);
+        if (res.success) {
+          fetchAssignments();
+        } else {
+          alert("Failed to confirm delivery: " + (res.error || "Unknown error"));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to advance status:", err);
+    }
   };
 
   const displayedOrders = tab === "active" ? activeDeliveries : deliveryHistory;
@@ -46,17 +88,20 @@ export default function DeliveryApp() {
     <div className="min-h-screen bg-cream pb-12">
       {/* Header */}
       <header className="bg-maroon text-cream px-6 py-6 pb-8 rounded-b-[2rem] shadow-sm sticky top-0 z-10 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-32 h-32 bg-gold/10 rounded-full blur-2xl" />
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10 backdrop-blur-sm">
-            <Package className="w-5 h-5 text-gold" />
+        <div className="absolute right-0 top-0 w-32 h-32 bg-gold/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="flex justify-between items-center relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10 backdrop-blur-sm">
+              <Package className="w-5 h-5 text-gold" />
+            </div>
+            <div>
+              <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto brightness-0 invert mb-0.5" />
+              <p className="text-sm text-cream/60 font-medium">
+                Courier Panel
+              </p>
+            </div>
           </div>
-          <div>
-            <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto brightness-0 invert mb-0.5" />
-            <p className="text-sm text-cream/60 font-medium">
-              Courier Panel
-            </p>
-          </div>
+          <ProfileDropdown />
         </div>
 
         {/* Tabs */}
@@ -89,7 +134,12 @@ export default function DeliveryApp() {
       </header>
 
       <main className="max-w-md mx-auto p-5 space-y-5 -mt-4 relative z-20">
-        {displayedOrders.length === 0 ? (
+        {loading ? (
+          <div className="py-20 text-center text-maroon/50 flex flex-col items-center bg-white rounded-3xl border border-ivory shadow-sm">
+            <div className="w-6 h-6 border-2 border-maroon border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm font-medium">Loading deliveries...</p>
+          </div>
+        ) : displayedOrders.length === 0 ? (
           <div className="py-20 text-center text-maroon/50 flex flex-col items-center bg-white rounded-3xl border border-ivory shadow-sm">
             <div className="w-20 h-20 bg-ivory rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="w-10 h-10 text-gold" />

@@ -17,21 +17,29 @@ import {
   X,
   MapPin,
 } from "lucide-react";
-import { useCart, useOrders } from "@/lib/store";
-import { mockMenuItems, mockCategories } from "@/lib/mock-data";
-import type { MenuItem } from "@/lib/types";
-import { cn, formatPrice, getDeliveryDateLabel, getCountdownToTime, generateOrderNumber } from "@/lib/utils";
+import { useCart } from "@/lib/store";
+import type { MenuItem, Category, Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
+import { cn, formatPrice, getDeliveryDateLabel, getCountdownToTime } from "@/lib/utils";
+import { menuApi, ordersApi, usersApi } from "@/lib/api";
+import ProfileDropdown from "@/components/ProfileDropdown";
 
 type View = "menu" | "cart" | "checkout" | "success" | "orders";
 
 export default function CustomerApp() {
   const cart = useCart();
-  const { orders, placeOrder } = useOrders();
   const [view, setView] = useState<View>("menu");
-  const [activeCategory, setActiveCategory] = useState(mockCategories[0].id);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [countdown, setCountdown] = useState(getCountdownToTime());
+  const [loading, setLoading] = useState(true);
+  const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
+
+  // User's order list
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -45,13 +53,80 @@ export default function CustomerApp() {
   });
   const [payment, setPayment] = useState<"cod" | "online">("online");
 
+  // Load menu and categories on mount
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [catRes, dailyRes] = await Promise.all([
+          menuApi.categories(),
+          menuApi.daily(),
+        ]);
+        if (catRes.success && catRes.data) {
+          const cats = catRes.data as Category[];
+          setCategories(cats);
+          if (cats.length > 0) setActiveCategory(cats[0].id);
+        }
+        if (dailyRes.success && dailyRes.data) {
+          const rawItems = (dailyRes.data as any).tomorrow?.items || [];
+          const mapped: MenuItem[] = rawItems.map((entry: any) => {
+            const dbItem = entry.menuItem;
+            return {
+              id: dbItem.id,
+              categoryId: dbItem.categoryId,
+              name: dbItem.name,
+              slug: dbItem.slug,
+              description: dbItem.description,
+              price: dbItem.price,
+              imageUrl: dbItem.imageUrl,
+              isHealthy: dbItem.isHealthy,
+              nutritionInfo: dbItem.nutritionInfo || undefined,
+              prepNotes: dbItem.prepNotes || undefined,
+              tags: dbItem.tags ? dbItem.tags.map((t: any) => t.tag?.name || t.tagId) : [],
+              isActive: dbItem.isActive,
+              sortOrder: dbItem.sortOrder,
+            };
+          });
+          setMenuItems(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to load customer menu:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Load orders when view becomes "orders"
+  useEffect(() => {
+    if (view === "orders") {
+      setLoadingOrders(true);
+      ordersApi.list(1, 20).then((res) => {
+        if (res.success && res.data) {
+          const rawOrders = res.data as any[];
+          const mapped: Order[] = rawOrders.map((o: any) => ({
+            ...o,
+            status: o.status.toLowerCase() as OrderStatus,
+            paymentMethod: o.paymentMethod.toLowerCase() as PaymentMethod,
+            paymentStatus: o.paymentStatus.toLowerCase() as PaymentStatus,
+          }));
+          setUserOrders(mapped);
+        }
+      }).catch((err) => {
+        console.error("Failed to load orders:", err);
+      }).finally(() => {
+        setLoadingOrders(false);
+      });
+    }
+  }, [view]);
+
   // Countdown timer
   useEffect(() => {
     const timer = setInterval(() => setCountdown(getCountdownToTime()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const filteredItems = mockMenuItems.filter((item) => {
+  const filteredItems = menuItems.filter((item) => {
     const matchesCategory = item.categoryId === activeCategory;
     const matchesSearch =
       !searchQuery ||
@@ -67,44 +142,63 @@ export default function CustomerApp() {
     cart.addItem({ menuItem: item, quantity: 1 });
   };
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newOrder = {
-      id: `ord-${Date.now()}`,
-      userId: "guest",
-      addressId: "new",
-      address: {
-        id: "new",
-        userId: "guest",
+    try {
+      // 1. Add Address
+      const addrRes = await usersApi.addAddress({
         label: "Delivery",
-        ...address,
+        street: address.street,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        instructions: address.instructions || undefined,
         isDefault: true,
-      },
-      orderNumber: generateOrderNumber(),
-      status: "placed" as const,
-      subtotal: cart.subtotal,
-      tax: cart.tax,
-      deliveryFee: cart.deliveryFee,
-      discount: 0,
-      total: cart.total,
-      paymentMethod: payment,
-      paymentStatus: payment === "online" ? ("paid" as const) : ("pending" as const),
-      deliveryDate: new Date(Date.now() + 86400000).toISOString(),
-      specialInstructions: address.instructions || undefined,
-      items: cart.items.map((item, i) => ({
-        id: `oi-${Date.now()}-${i}`,
-        orderId: `ord-${Date.now()}`,
+      });
+
+      if (!addrRes.success || !addrRes.data) {
+        alert("Failed to save delivery address: " + (addrRes.error || "Unknown error"));
+        return;
+      }
+
+      const addressId = (addrRes.data as any).id;
+
+      // 2. Map items
+      const items = cart.items.map((item) => ({
         menuItemId: item.menuItem.id,
-        name: item.menuItem.name,
-        price: item.menuItem.price,
         quantity: item.quantity,
-        imageUrl: item.menuItem.imageUrl,
-      })),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    placeOrder(newOrder);
-    setView("success");
+      }));
+
+      // Delivery Date is tomorrow
+      const deliveryDate = new Date();
+      deliveryDate.setDate(deliveryDate.getDate() + 1);
+
+      // 3. Place Order
+      const orderRes = await ordersApi.place({
+        addressId,
+        deliveryDate: deliveryDate.toISOString().split("T")[0],
+        items,
+        paymentMethod: payment === "online" ? "ONLINE" : "COD",
+        specialInstructions: address.instructions || undefined,
+      });
+
+      if (orderRes.success && orderRes.data) {
+        cart.clearCart();
+        const rawOrder = orderRes.data as any;
+        setLastPlacedOrder({
+          ...rawOrder,
+          status: rawOrder.status.toLowerCase() as OrderStatus,
+          paymentMethod: rawOrder.paymentMethod.toLowerCase() as PaymentMethod,
+          paymentStatus: rawOrder.paymentStatus.toLowerCase() as PaymentStatus,
+        });
+        setView("success");
+      } else {
+        alert("Failed to place order: " + (orderRes.error || "Unknown error"));
+      }
+    } catch (err) {
+      console.error("Checkout failed:", err);
+      alert("An unexpected error occurred during checkout.");
+    }
   };
 
   // ==================== SUCCESS VIEW ====================
@@ -131,7 +225,7 @@ export default function CustomerApp() {
               <div className="flex justify-between border-b border-ivory pb-4">
                 <span className="text-maroon/60 font-medium">Order Number</span>
                 <span className="font-bold text-maroon font-mono text-sm">
-                  {orders[0]?.orderNumber || "BK-XXXX"}
+                  {lastPlacedOrder?.orderNumber || "BK-XXXX"}
                 </span>
               </div>
               <div className="flex justify-between border-b border-ivory pb-4">
@@ -143,7 +237,7 @@ export default function CustomerApp() {
               <div className="flex justify-between">
                 <span className="text-maroon/60 font-medium">Total</span>
                 <span className="font-bold text-maroon text-lg">
-                  {formatPrice(orders[0]?.total || 0)}
+                  {formatPrice(lastPlacedOrder?.total || 0)}
                 </span>
               </div>
             </div>
@@ -171,7 +265,6 @@ export default function CustomerApp() {
 
   // ==================== ORDERS VIEW ====================
   if (view === "orders") {
-    const myOrders = orders.filter((o) => o.userId === "guest" || true);
     return (
       <div className="max-w-md mx-auto min-h-screen bg-cream pb-safe">
         <header className="bg-white p-4 sticky top-0 z-10 flex items-center gap-3 border-b border-ivory shadow-sm">
@@ -185,13 +278,18 @@ export default function CustomerApp() {
         </header>
 
         <main className="p-4 space-y-4">
-          {myOrders.length === 0 ? (
+          {loadingOrders ? (
+            <div className="py-20 text-center">
+              <div className="w-6 h-6 border-2 border-maroon border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-maroon/50 font-medium">Loading orders...</p>
+            </div>
+          ) : userOrders.length === 0 ? (
             <div className="py-20 text-center">
               <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-ivory" />
               <p className="text-maroon/50 font-medium">No orders yet</p>
             </div>
           ) : (
-            myOrders.map((order) => (
+            userOrders.map((order) => (
               <div
                 key={order.id}
                 className="bg-white rounded-2xl border border-ivory shadow-sm overflow-hidden"
@@ -508,9 +606,7 @@ export default function CustomerApp() {
             >
               <ShoppingBag className="w-5 h-5 text-cream" />
             </button>
-            <button className="w-11 h-11 rounded-full bg-cream/10 flex items-center justify-center hover:bg-cream/20 transition-colors border border-cream/20 backdrop-blur-sm">
-              <UserCircle className="w-5 h-5 text-cream" />
-            </button>
+            <ProfileDropdown />
           </div>
         </div>
 
@@ -592,20 +688,28 @@ export default function CustomerApp() {
       {/* Categories */}
       <div className="px-4 py-6 hide-scrollbar overflow-x-auto">
         <div className="flex gap-2.5 px-1 w-max">
-          {mockCategories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
-              className={cn(
-                "px-4 py-2.5 rounded-full text-sm font-bold shadow-sm whitespace-nowrap transition-all duration-200 border",
-                activeCategory === cat.id
-                  ? "bg-maroon border-maroon text-cream scale-105 shadow-md"
-                  : "bg-white border-ivory text-maroon/70 hover:bg-cream hover:border-gold/30"
-              )}
-            >
-              {cat.name}
-            </button>
-          ))}
+          {loading ? (
+            <div className="flex gap-2.5">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="w-24 h-10 bg-white border border-ivory rounded-full animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={cn(
+                  "px-4 py-2.5 rounded-full text-sm font-bold shadow-sm whitespace-nowrap transition-all duration-200 border",
+                  activeCategory === cat.id
+                    ? "bg-maroon border-maroon text-cream scale-105 shadow-md"
+                    : "bg-white border-ivory text-maroon/70 hover:bg-cream hover:border-gold/30"
+                )}
+              >
+                {cat.name}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
