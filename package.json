@@ -11,7 +11,7 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "dev:all": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run db:generate && npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run generate --workspace=packages/prisma",
     "db:push": "npm run push --workspace=packages/prisma",
