@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const router = useRouter();
   const params = useSearchParams();
   const success = params.get("success");
@@ -26,3 +26,20 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <img src="/logo.png" alt="Brahma Kalasha" className="h-14 w-auto opacity-80" />
+          <div className="w-6 h-6 border-2 border-maroon border-t-transparent rounded-full animate-spin" />
+          <p className="text-maroon/55 text-sm font-medium">Loading…</p>
+        </div>
+      </div>
+    }>
+      <AuthCallbackContent />
+    </Suspense>
+  );
+}
+

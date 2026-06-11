@@ -99,7 +99,7 @@ export class MenuService {
 
     await this.findCategoryById(dto.categoryId);
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: any) => {
       const item = await tx.menuItem.create({ data: itemData });
 
       if (tags && tags.length > 0) {
@@ -117,7 +117,7 @@ export class MenuService {
     await this.getMenuItemById(id);
     const { tags, ...itemData } = dto;
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: any) => {
       const item = await tx.menuItem.update({
         where: { id },
         data: itemData,

@@ -134,7 +134,7 @@ export class OrdersService {
       .padStart(3, '0')}`;
 
     // Create order in transaction
-    const order = await this.prisma.$transaction(async (tx) => {
+    const order = await this.prisma.$transaction(async (tx: any) => {
       const newOrder = await tx.order.create({
         data: {
           userId,
@@ -285,7 +285,7 @@ export class OrdersService {
       );
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx: any) => {
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
         data: { status: 'CANCELLED' },
@@ -377,7 +377,7 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found');
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx: any) => {
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
         data: { status: dto.status as any },

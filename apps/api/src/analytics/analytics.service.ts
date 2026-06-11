@@ -102,7 +102,7 @@ export class AnalyticsService {
       },
     });
 
-    return orderItems.map((item) => ({
+    return orderItems.map((item: any) => ({
       menuItemId: item.menuItemId,
       name: item.name,
       count: item._sum.quantity || 0,

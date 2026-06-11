@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from") || "/";
@@ -173,3 +173,20 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <img src="/logo.png" alt="Brahma Kalasha" className="h-14 w-auto opacity-80" />
+          <div className="w-6 h-6 border-2 border-maroon border-t-transparent rounded-full animate-spin" />
+          <p className="text-maroon/55 text-sm font-medium">Loading…</p>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+

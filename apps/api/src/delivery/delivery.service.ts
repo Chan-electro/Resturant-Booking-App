@@ -66,7 +66,7 @@ export class DeliveryService {
       throw new BadRequestException('Delivery is not in ASSIGNED status');
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx: any) => {
       const updatedDelivery = await tx.delivery.update({
         where: { id: deliveryId },
         data: {
@@ -125,7 +125,7 @@ export class DeliveryService {
       throw new BadRequestException('Order must be picked up before marking as delivered');
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx: any) => {
       const updatedDelivery = await tx.delivery.update({
         where: { id: deliveryId },
         data: {
@@ -222,7 +222,7 @@ export class DeliveryService {
     });
     if (!driver) throw new NotFoundException('Driver not found or inactive');
 
-    const delivery = await this.prisma.$transaction(async (tx) => {
+    const delivery = await this.prisma.$transaction(async (tx: any) => {
       const existingDelivery = await tx.delivery.findFirst({
         where: { orderId: dto.orderId },
       });
