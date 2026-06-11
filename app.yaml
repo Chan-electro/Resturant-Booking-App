@@ -16,7 +16,7 @@ services:
     envs:
       - key: DATABASE_URL
         scope: RUN_AND_BUILD_TIME
-        value: ${db.DATABASE_URL}
+        value: ${db.DATABASE_URL}&schema=app_schema
       - key: JWT_SECRET
         scope: RUN_TIME
         value: Vt/rxU3v09YjRT5mEqmaoy/n17jcDTVHzRJ+OXeGMA0=
@@ -58,6 +58,21 @@ services:
       - key: NEXTAUTH_SECRET
         scope: RUN_TIME
         value: nAGyh/ThXL5MFJLwUIJ5ePLG84UkQz5AKg/FtP9H2ao=
+
+jobs:
+  - name: db-migrate
+    environment_slug: node-js
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: Chan-electro/Resturant-Booking-App
+    source_dir: /
+    build_command: npm run db:generate
+    run_command: npx prisma db push --schema=packages/prisma/schema.prisma --accept-data-loss && npm run db:seed
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${db.DATABASE_URL}&schema=app_schema
 
 databases:
   - engine: PG
