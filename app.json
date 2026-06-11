@@ -105,7 +105,7 @@
         },
         "source_dir": "/",
         "build_command": "npm run db:generate",
-        "run_command": "npx prisma db push --schema=packages/prisma/schema.prisma --accept-data-loss && npx tsx apps/api/prisma/seed.ts",
+        "run_command": "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && npx tsx apps/api/prisma/seed.ts",
         "envs": [
           {
             "key": "DATABASE_URL",
