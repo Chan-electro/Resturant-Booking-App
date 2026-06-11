@@ -46,6 +46,10 @@ export const viewport: Viewport = {
   themeColor: "#4B0F16",
 };
 
+// Force dynamic rendering for all pages – prevents Next.js from serving
+// pre-rendered RSC flight payloads (.rsc) as raw text via CDN/proxy caches.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: {
