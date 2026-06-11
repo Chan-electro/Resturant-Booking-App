@@ -13,7 +13,7 @@
         },
         "source_dir": "/",
         "build_command": "npm run build",
-        "run_command": "node apps/api/dist/main",
+        "run_command": "node apps/api/dist/src/main.js",
         "http_port": 3001,
         "routes": [
           {
