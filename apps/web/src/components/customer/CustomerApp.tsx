@@ -204,60 +204,62 @@ export default function CustomerApp() {
   // ==================== SUCCESS VIEW ====================
   if (view === "success") {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-cream flex flex-col pt-16 px-6 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-ivory/50 to-transparent pointer-events-none" />
-        <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10 animate-scale-in">
-          <div className="w-24 h-24 bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100">
-            <CheckCircle className="w-12 h-12" />
-          </div>
-          <h2 className="text-3xl font-bold text-maroon mb-3 font-display">
-            Order Confirmed!
-          </h2>
-          <p className="text-maroon/70 mb-8 px-4 leading-relaxed">
-            Your wholesome vegetarian meal is booked for{" "}
-            <strong>{getDeliveryDateLabel()}</strong>. The kitchen has received
-            your order.
-          </p>
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center p-4 md:p-8">
+        <div className="w-full max-w-md md:max-w-xl bg-white rounded-3xl border border-ivory shadow-lg p-6 md:p-10 flex flex-col relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-ivory/25 to-transparent pointer-events-none" />
+          <div className="flex-grow flex flex-col items-center justify-center text-center relative z-10 animate-scale-in">
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100">
+              <CheckCircle className="w-10 h-10 md:w-12 md:h-12" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-maroon mb-3 font-display">
+              Order Confirmed!
+            </h2>
+            <p className="text-maroon/70 mb-8 px-4 leading-relaxed text-sm md:text-base">
+              Your wholesome vegetarian meal is booked for{" "}
+              <strong>{getDeliveryDateLabel()}</strong>. The kitchen has received
+              your order.
+            </p>
 
-          <div className="bg-white p-6 rounded-2xl w-full shadow-sm border border-ivory text-left relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-ivory/30 w-32 h-32 rounded-full blur-3xl" />
-            <div className="relative z-10 space-y-4">
-              <div className="flex justify-between border-b border-ivory pb-4">
-                <span className="text-maroon/60 font-medium">Order Number</span>
-                <span className="font-bold text-maroon font-mono text-sm">
-                  {lastPlacedOrder?.orderNumber || "BK-XXXX"}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-ivory pb-4">
-                <span className="text-maroon/60 font-medium">Delivery</span>
-                <span className="font-bold text-maroon">
-                  {getDeliveryDateLabel()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-maroon/60 font-medium">Total</span>
-                <span className="font-bold text-maroon text-lg">
-                  {formatPrice(lastPlacedOrder?.total || 0)}
-                </span>
+            <div className="bg-cream/45 p-6 rounded-2xl w-full border border-ivory/60 text-left relative overflow-hidden mb-6">
+              <div className="absolute top-0 right-0 bg-ivory/20 w-32 h-32 rounded-full blur-3xl" />
+              <div className="relative z-10 space-y-4 text-sm md:text-base">
+                <div className="flex justify-between border-b border-ivory/60 pb-4">
+                  <span className="text-maroon/60 font-medium">Order Number</span>
+                  <span className="font-bold text-maroon font-mono text-sm">
+                    {lastPlacedOrder?.orderNumber || "BK-XXXX"}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-ivory/60 pb-4">
+                  <span className="text-maroon/60 font-medium">Delivery</span>
+                  <span className="font-bold text-maroon">
+                    {getDeliveryDateLabel()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-maroon/60 font-medium">Total</span>
+                  <span className="font-bold text-maroon text-lg">
+                    {formatPrice(lastPlacedOrder?.total || 0)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div className="p-6 pb-safe z-10 relative space-y-3">
-          <button
-            onClick={() => {
-              setView("orders");
-            }}
-            className="w-full py-4 bg-white text-maroon font-bold rounded-xl border border-ivory shadow-sm hover:bg-ivory transition-colors"
-          >
-            View My Orders
-          </button>
-          <button
-            onClick={() => setView("menu")}
-            className="w-full py-4 bg-maroon text-cream font-bold rounded-xl shadow-sm hover:bg-burgundy transition-colors active:scale-[0.98]"
-          >
-            Back to Menu
-          </button>
+          <div className="z-10 relative space-y-3">
+            <button
+              onClick={() => {
+                setView("orders");
+              }}
+              className="w-full py-3.5 bg-white text-maroon font-bold rounded-xl border border-ivory shadow-sm hover:bg-cream transition-colors text-sm md:text-base"
+            >
+              View My Orders
+            </button>
+            <button
+              onClick={() => setView("menu")}
+              className="w-full py-3.5 bg-maroon text-cream font-bold rounded-xl shadow-sm hover:bg-burgundy transition-colors active:scale-[0.98] text-sm md:text-base"
+            >
+              Back to Menu
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -266,8 +268,8 @@ export default function CustomerApp() {
   // ==================== ORDERS VIEW ====================
   if (view === "orders") {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-cream pb-safe">
-        <header className="bg-white p-4 sticky top-0 z-10 flex items-center gap-3 border-b border-ivory shadow-sm">
+      <div className="w-full max-w-4xl mx-auto min-h-screen bg-cream pb-safe md:py-8 px-4">
+        <header className="bg-white p-4 rounded-b-2xl md:rounded-2xl sticky top-0 md:relative z-10 flex items-center gap-3 border border-ivory shadow-sm mb-6">
           <button
             onClick={() => setView("menu")}
             className="w-10 h-10 rounded-full border border-ivory flex items-center justify-center hover:bg-cream transition-colors text-maroon"
@@ -277,64 +279,70 @@ export default function CustomerApp() {
           <h1 className="text-xl font-bold text-maroon font-display">My Orders</h1>
         </header>
 
-        <main className="p-4 space-y-4">
+        <main>
           {loadingOrders ? (
             <div className="py-20 text-center">
               <div className="w-6 h-6 border-2 border-maroon border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-maroon/50 font-medium">Loading orders...</p>
             </div>
           ) : userOrders.length === 0 ? (
-            <div className="py-20 text-center">
+            <div className="py-20 text-center bg-white rounded-2xl border border-ivory">
               <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-ivory" />
               <p className="text-maroon/50 font-medium">No orders yet</p>
             </div>
           ) : (
-            userOrders.map((order) => (
-              <div
-                key={order.id}
-                className="bg-white rounded-2xl border border-ivory shadow-sm overflow-hidden"
-              >
-                <div className="p-4 border-b border-ivory flex justify-between items-center">
-                  <div>
-                    <p className="font-mono text-xs text-maroon/50">
-                      {order.orderNumber}
-                    </p>
-                    <p className="font-bold text-maroon mt-1">
-                      {formatPrice(order.total)}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border",
-                      order.status === "delivered" || order.status === "completed"
-                        ? "bg-green-50 text-green-800 border-green-200"
-                        : order.status === "cancelled"
-                          ? "bg-red-50 text-red-800 border-red-200"
-                          : order.status === "preparing"
-                            ? "bg-amber-50 text-amber-800 border-amber-200"
-                            : "bg-beige text-maroon border-beige"
-                    )}
-                  >
-                    {order.status.replace(/_/g, " ")}
-                  </span>
-                </div>
-                <div className="p-4 space-y-2">
-                  {order.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex justify-between text-sm"
-                    >
-                      <span className="text-maroon/70">
-                        {item.quantity}x {item.name}
-                      </span>
-                      <span className="font-medium text-maroon">
-                        {formatPrice(item.price * item.quantity)}
-                      </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {userOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-2xl border border-ivory shadow-sm overflow-hidden flex flex-col justify-between"
+                >
+                  <div className="p-4 border-b border-ivory flex justify-between items-center bg-cream/20">
+                    <div>
+                      <p className="font-mono text-xs text-maroon/50">
+                        {order.orderNumber}
+                      </p>
+                      <p className="font-bold text-maroon mt-1 text-lg">
+                        {formatPrice(order.total)}
+                      </p>
                     </div>
-                  ))}
+                    <span
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide border",
+                        order.status === "delivered" || order.status === "completed"
+                          ? "bg-green-50 text-green-800 border-green-200"
+                          : order.status === "cancelled"
+                            ? "bg-red-50 text-red-800 border-red-200"
+                            : order.status === "preparing"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-beige text-maroon border-beige"
+                      )}
+                    >
+                      {order.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <div className="p-4 space-y-2 flex-grow">
+                    {order.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex justify-between text-sm"
+                      >
+                        <span className="text-maroon/70">
+                          {item.quantity}x {item.name}
+                        </span>
+                        <span className="font-medium text-maroon">
+                          {formatPrice(item.price * item.quantity)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-4 py-3 bg-cream/10 border-t border-ivory/50 flex justify-between items-center text-xs text-maroon/50">
+                    <span>Delivery: {getDeliveryDateLabel()}</span>
+                    <span>Method: {order.paymentMethod.toUpperCase()}</span>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </main>
       </div>
@@ -344,8 +352,8 @@ export default function CustomerApp() {
   // ==================== CART / CHECKOUT VIEW ====================
   if (view === "cart" || view === "checkout") {
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-cream pb-safe relative">
-        <header className="bg-white p-4 sticky top-0 z-10 flex items-center justify-between border-b border-ivory shadow-sm">
+      <div className="w-full max-w-5xl mx-auto min-h-screen bg-cream pb-safe relative px-4 md:py-8">
+        <header className="bg-white p-4 rounded-b-2xl md:rounded-2xl sticky top-0 md:relative z-10 flex items-center justify-between border border-ivory shadow-sm mb-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setView("menu")}
@@ -360,9 +368,9 @@ export default function CustomerApp() {
           </span>
         </header>
 
-        <main className="p-4 space-y-5 pb-32">
+        <main className="p-0 grid grid-cols-1 lg:grid-cols-12 gap-8 pb-32">
           {/* Order Summary */}
-          <section className="bg-white p-5 rounded-2xl shadow-sm border border-ivory">
+          <section className="lg:col-span-6 bg-white p-5 rounded-2xl shadow-sm border border-ivory h-fit">
             <h2 className="text-xs font-bold text-maroon/60 uppercase tracking-widest mb-4 border-b border-ivory pb-3">
               {getDeliveryDateLabel()} — Order
             </h2>
@@ -446,7 +454,7 @@ export default function CustomerApp() {
           <form
             id="checkout-form"
             onSubmit={handleCheckout}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-ivory space-y-5"
+            className="lg:col-span-6 bg-white p-6 rounded-2xl shadow-sm border border-ivory space-y-5"
           >
             <h2 className="text-xs font-bold text-maroon/60 uppercase tracking-widest mb-1">
               Delivery Details
@@ -565,10 +573,26 @@ export default function CustomerApp() {
                 <span className="font-bold text-sm">Cash on Delivery</span>
               </button>
             </div>
+
+            {/* Desktop Place Order Button */}
+            <div className="hidden md:block mt-6">
+              <button
+                form="checkout-form"
+                type="submit"
+                disabled={cart.totalItems === 0}
+                className="w-full py-4 bg-maroon text-cream font-bold text-lg rounded-xl shadow-sm hover:bg-burgundy transition-all flex justify-between items-center px-6 disabled:opacity-50 active:scale-[0.98]"
+              >
+                <span>Place Order</span>
+                <span className="bg-cream/20 px-3 py-1 rounded-lg">
+                  {formatPrice(cart.total)}
+                </span>
+              </button>
+            </div>
           </form>
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-ivory p-4 pb-safe z-20 shadow-[0_-4px_20px_rgba(75,15,22,0.05)]">
+        {/* Mobile Place Order Button */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-ivory p-4 pb-safe z-20 shadow-[0_-4px_20px_rgba(75,15,22,0.05)]">
           <button
             form="checkout-form"
             type="submit"
@@ -587,9 +611,9 @@ export default function CustomerApp() {
 
   // ==================== MENU VIEW (Home) ====================
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-cream relative pb-24 shadow-2xl overflow-hidden">
+    <div className="w-full min-h-screen bg-cream relative pb-24">
       {/* Header */}
-      <header className="bg-maroon text-cream px-6 pt-12 pb-14 rounded-b-[2rem] shadow-sm relative z-10 overflow-hidden">
+      <header className="bg-maroon text-cream px-6 pt-12 pb-14 rounded-b-[2rem] shadow-sm relative z-10 overflow-hidden max-w-md lg:max-w-6xl mx-auto lg:rounded-[2rem] lg:mt-6">
         <div className="absolute -right-12 -top-12 w-48 h-48 bg-burgundy rounded-full blur-3xl opacity-50" />
         <div className="absolute top-1/2 left-0 w-32 h-32 bg-gold/20 rounded-full blur-3xl opacity-50" />
 
@@ -648,7 +672,7 @@ export default function CustomerApp() {
       </header>
 
       {/* Search Toggle */}
-      <div className="px-5 -mt-5 relative z-20">
+      <div className="px-5 -mt-5 relative z-20 max-w-md lg:max-w-6xl mx-auto lg:px-8">
         <button
           onClick={() => setShowSearch(!showSearch)}
           className="w-full bg-white rounded-2xl p-4 shadow-sm border border-ivory flex items-center gap-3 text-maroon/40 hover:border-gold/30 transition-colors"
@@ -660,7 +684,7 @@ export default function CustomerApp() {
 
       {/* Search Input */}
       {showSearch && (
-        <div className="px-5 mt-3 animate-slide-down">
+        <div className="px-5 mt-3 animate-slide-down max-w-md lg:max-w-6xl mx-auto lg:px-8">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-maroon/40" />
             <input
@@ -686,8 +710,8 @@ export default function CustomerApp() {
       )}
 
       {/* Categories */}
-      <div className="px-4 py-6 hide-scrollbar overflow-x-auto">
-        <div className="flex gap-2.5 px-1 w-max">
+      <div className="px-4 py-6 hide-scrollbar overflow-x-auto lg:overflow-visible max-w-md lg:max-w-6xl mx-auto lg:px-8">
+        <div className="flex lg:flex-wrap gap-2.5 px-1 w-max lg:w-full">
           {loading ? (
             <div className="flex gap-2.5">
               {[1, 2, 3].map((n) => (
@@ -713,102 +737,209 @@ export default function CustomerApp() {
         </div>
       </div>
 
-      {/* Menu Items */}
-      <main className="px-5 space-y-4 pb-12">
-        {filteredItems.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-maroon/40 font-medium">
-              No dishes found in this category
-            </p>
-          </div>
-        ) : (
-          filteredItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-[1.25rem] p-4 shadow-sm border border-ivory flex gap-4 transition-transform active:scale-[0.99] relative overflow-hidden group"
-            >
-              <div className="w-[100px] h-[110px] rounded-2xl overflow-hidden bg-cream shrink-0 relative border border-ivory/50">
-                <img
-                  src={item.imageUrl}
-                  alt={item.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
-                />
-                {item.isHealthy && (
-                  <div className="absolute top-2 left-2 bg-green-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1">
-                    <Leaf className="w-3 h-3" /> Healthy
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 flex flex-col justify-between py-0.5">
-                <div>
-                  <h3 className="font-bold text-maroon leading-tight pr-2 text-base">
-                    {item.name}
-                  </h3>
-                  <p className="text-[13px] text-maroon/55 line-clamp-2 leading-relaxed mt-1">
-                    {item.description}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {item.tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-[10px] bg-ivory font-bold text-maroon/65 px-2 py-0.5 rounded-md"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex justify-between items-end mt-3 -mb-0.5">
-                  <span className="font-bold text-lg text-gold">
-                    {formatPrice(item.price)}
-                  </span>
-
-                  {getQty(item.id) > 0 ? (
-                    <div className="flex items-center gap-3 bg-cream rounded-xl p-1 shadow-sm border border-ivory">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cart.updateQty(item.id, getQty(item.id) - 1);
-                        }}
-                        className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-maroon shadow-sm border border-ivory/50 hover:bg-cream transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-4 text-center font-bold text-maroon">
-                        {getQty(item.id)}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cart.updateQty(item.id, getQty(item.id) + 1);
-                        }}
-                        className="w-8 h-8 rounded-lg bg-maroon flex items-center justify-center text-cream shadow-sm hover:bg-burgundy transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
+      {/* Responsive Columns Wrapper */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-5 lg:px-8 max-w-md lg:max-w-6xl mx-auto">
+        {/* Menu Items (now a grid on tablet/desktop) */}
+        <main className="lg:col-span-8 space-y-4 pb-12 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
+          {filteredItems.length === 0 ? (
+            <div className="py-12 text-center col-span-full">
+              <p className="text-maroon/40 font-medium">
+                No dishes found in this category
+              </p>
+            </div>
+          ) : (
+            filteredItems.map((item) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-[1.25rem] p-4 shadow-sm border border-ivory flex gap-4 transition-transform active:scale-[0.99] relative overflow-hidden group h-fit"
+              >
+                <div className="w-[100px] h-[110px] rounded-2xl overflow-hidden bg-cream shrink-0 relative border border-ivory/50">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                  {item.isHealthy && (
+                    <div className="absolute top-2 left-2 bg-green-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1">
+                      <Leaf className="w-3 h-3" /> Healthy
                     </div>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAdd(item);
-                      }}
-                      className="bg-cream text-maroon font-bold px-5 py-2 text-sm rounded-xl hover:bg-gold hover:text-white transition-colors shadow-sm border border-ivory"
-                    >
-                      Add
-                    </button>
                   )}
                 </div>
-              </div>
-            </div>
-          ))
-        )}
-      </main>
+                <div className="flex-1 flex flex-col justify-between py-0.5">
+                  <div>
+                    <h3 className="font-bold text-maroon leading-tight pr-2 text-base">
+                      {item.name}
+                    </h3>
+                    <p className="text-[13px] text-maroon/55 line-clamp-2 leading-relaxed mt-1">
+                      {item.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {item.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[10px] bg-ivory font-bold text-maroon/65 px-2 py-0.5 rounded-md"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-end mt-3 -mb-0.5">
+                    <span className="font-bold text-lg text-gold">
+                      {formatPrice(item.price)}
+                    </span>
 
-      {/* Floating Cart Button */}
+                    {getQty(item.id) > 0 ? (
+                      <div className="flex items-center gap-3 bg-cream rounded-xl p-1 shadow-sm border border-ivory">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cart.updateQty(item.id, getQty(item.id) - 1);
+                          }}
+                          className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-maroon shadow-sm border border-ivory/50 hover:bg-cream transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="w-4 text-center font-bold text-maroon">
+                          {getQty(item.id)}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cart.updateQty(item.id, getQty(item.id) + 1);
+                          }}
+                          className="w-8 h-8 rounded-lg bg-maroon flex items-center justify-center text-cream shadow-sm hover:bg-burgundy transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAdd(item);
+                        }}
+                        className="bg-cream text-maroon font-bold px-5 py-2 text-sm rounded-xl hover:bg-gold hover:text-white transition-colors shadow-sm border border-ivory"
+                      >
+                        Add
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </main>
+
+        {/* Persistent desktop cart sidebar (hidden on mobile) */}
+        <div className="hidden lg:block lg:col-span-4 h-fit sticky top-6">
+          <div className="bg-white rounded-[1.25rem] border border-ivory shadow-sm p-6 space-y-6">
+            <div className="flex justify-between items-center border-b border-ivory pb-4">
+              <h2 className="text-lg font-bold text-maroon font-display flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-gold" />
+                Your Order
+              </h2>
+              <span className="text-xs font-bold text-cream bg-gold px-2.5 py-1 rounded-full">
+                {cart.totalItems} items
+              </span>
+            </div>
+
+            {cart.items.length === 0 ? (
+              <div className="py-12 text-center text-maroon/40 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-cream border border-ivory flex items-center justify-center mx-auto text-xl">
+                  🛒
+                </div>
+                <p className="text-sm font-semibold">Your cart is empty</p>
+                <p className="text-xs leading-relaxed max-w-[180px] mx-auto">
+                  Add delicious wholesome meals from the menu.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 hide-scrollbar">
+                  {cart.items.map((item) => (
+                    <div
+                      key={item.menuItem.id}
+                      className="flex justify-between items-center bg-cream p-3 rounded-xl border border-ivory/50"
+                    >
+                      <div className="min-w-0 flex-1 mr-2">
+                        <h4 className="font-bold text-maroon text-xs leading-tight truncate">
+                          {item.menuItem.name}
+                        </h4>
+                        <p className="text-gold font-bold text-xs mt-1">
+                          {formatPrice(item.menuItem.price)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-white rounded-lg p-0.5 border border-ivory shrink-0">
+                        <button
+                          onClick={() =>
+                            cart.updateQty(item.menuItem.id, item.quantity - 1)
+                          }
+                          className="w-6 h-6 rounded bg-cream flex items-center justify-center text-maroon border border-ivory/50"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="w-4 text-center text-xs font-bold text-maroon">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() =>
+                            cart.updateQty(item.menuItem.id, item.quantity + 1)
+                          }
+                          className="w-6 h-6 rounded bg-maroon flex items-center justify-center text-cream"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2.5 pt-4 border-t border-ivory text-xs md:text-sm">
+                  <div className="flex justify-between text-maroon/60 font-medium">
+                    <span>Subtotal</span>
+                    <span>{formatPrice(cart.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-maroon/60 font-medium">
+                    <span>Tax (5%)</span>
+                    <span>{formatPrice(cart.tax)}</span>
+                  </div>
+                  <div className="flex justify-between text-maroon/60 font-medium">
+                    <span>Delivery</span>
+                    <span
+                      className={cn(
+                        "font-bold",
+                        cart.deliveryFee === 0
+                          ? "text-green-600 bg-green-50 px-2 rounded"
+                          : ""
+                      )}
+                    >
+                      {cart.deliveryFee === 0 ? "Free" : formatPrice(cart.deliveryFee)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg text-maroon pt-3 border-t border-ivory mt-2">
+                    <span>Total</span>
+                    <span>{formatPrice(cart.total)}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setView("checkout")}
+                  className="w-full py-3.5 bg-maroon text-cream font-bold rounded-xl shadow-md hover:bg-burgundy transition-all flex justify-between items-center px-4 active:scale-[0.98] text-sm"
+                >
+                  <span>Proceed to Checkout</span>
+                  <ArrowRight className="w-4 h-4 text-gold" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Cart Button (hidden on desktop) */}
       {cart.totalItems > 0 && (
-        <div className="fixed bottom-6 left-0 right-0 w-full max-w-md mx-auto px-5 z-30 animate-slide-up">
+        <div className="fixed bottom-6 left-0 right-0 w-full max-w-md mx-auto px-5 z-30 animate-slide-up lg:hidden">
           <button
             onClick={() => setView("cart")}
             className="w-full bg-maroon text-cream p-4 rounded-[1.25rem] shadow-[0_8px_30px_rgb(75,15,22,0.3)] flex justify-between items-center hover:bg-burgundy transition-all transform hover:-translate-y-0.5"
