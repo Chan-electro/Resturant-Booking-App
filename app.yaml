@@ -68,7 +68,7 @@ jobs:
       repo: Chan-electro/Resturant-Booking-App
     source_dir: /
     build_command: npm run db:generate
-    run_command: npx prisma db push --schema=packages/prisma/schema.prisma --accept-data-loss && npm run db:seed
+    run_command: npx prisma db push --schema=packages/prisma/schema.prisma --accept-data-loss && npx tsx apps/api/prisma/seed.ts
     envs:
       - key: DATABASE_URL
         scope: RUN_AND_BUILD_TIME
