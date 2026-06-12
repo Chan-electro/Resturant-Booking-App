@@ -28,11 +28,12 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register a new customer account' })
   async register(
+    @Req() req: Request,
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.register(registerDto);
-    this.setTokenCookies(res, result.accessToken, result.refreshToken);
+    this.setTokenCookies(req, res, result.accessToken, result.refreshToken);
     return { success: true, data: result };
   }
 
@@ -40,11 +41,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
   async login(
+    @Req() req: Request,
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.login(loginDto);
-    this.setTokenCookies(res, result.accessToken, result.refreshToken);
+    this.setTokenCookies(req, res, result.accessToken, result.refreshToken);
     return { success: true, data: result };
   }
 
@@ -69,7 +71,7 @@ export class AuthController {
     );
 
     const result = await this.authService.refreshTokens(decoded.sub, refreshToken as string);
-    this.setTokenCookies(res, result.accessToken, result.refreshToken);
+    this.setTokenCookies(req, res, result.accessToken, result.refreshToken);
     return { success: true, data: result };
   }
 
@@ -83,18 +85,18 @@ export class AuthController {
     const cookies = (req.cookies as Record<string, string>) || {};
     const accessToken = cookies.access_token;
     const refreshToken = cookies.refresh_token;
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     
     res.clearCookie('access_token', {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/',
     });
     res.clearCookie('refresh_token', {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/',
     });
 
@@ -121,7 +123,7 @@ export class AuthController {
     @Res() res: Response,
   ) {
     const result = req.user as any;
-    this.setTokenCookies(res, result.accessToken, result.refreshToken);
+    this.setTokenCookies(req, res, result.accessToken, result.refreshToken);
     const frontendUrl =
       process.env.FRONTEND_URL || 'http://localhost:3000';
     res.redirect(`${frontendUrl}/auth/callback?success=true`);
@@ -152,19 +154,19 @@ export class AuthController {
     return { success: true, data: profile };
   }
 
-  private setTokenCookies(res: Response, accessToken: string, refreshToken: string) {
-    const isProduction = process.env.NODE_ENV === 'production';
+  private setTokenCookies(req: Request, res: Response, accessToken: string, refreshToken: string) {
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('access_token', accessToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/',
       maxAge: 15 * 60 * 1000,
     });
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
