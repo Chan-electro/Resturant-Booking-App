@@ -88,7 +88,7 @@ function LoginContent() {
         <div className="relative z-10 w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex flex-col items-center mb-10 lg:hidden">
-            <img src="/logo.png" alt="Brahma Kalasha" className="h-16 w-auto mb-4 drop-shadow-sm brightness-0" />
+            <img src="/logo.png" alt="Brahma Kalasha" className="h-16 w-auto mb-4 drop-shadow-sm" />
             <h1 className="text-2xl font-bold text-maroon font-display">Brahma Kalasha</h1>
             <p className="text-maroon/50 text-sm font-medium mt-1">Premium Vegetarian Dining</p>
           </div>

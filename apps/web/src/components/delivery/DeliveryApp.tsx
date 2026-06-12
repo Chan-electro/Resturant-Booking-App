@@ -23,32 +23,65 @@ export default function DeliveryApp() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<DeliveryTab>("active");
 
-  const fetchAssignments = async () => {
+  const fetchDeliveries = async () => {
     try {
-      const res = await ordersApi.deliveryAssignments();
-      if (res.success && res.data) {
-        const rawOrders = res.data as any[];
-        const mapped: Order[] = rawOrders.map((o) => ({
-          ...o,
-          status: o.status.toLowerCase() as OrderStatus,
-          paymentMethod: o.paymentMethod.toLowerCase() as PaymentMethod,
-          paymentStatus: o.paymentStatus.toLowerCase() as PaymentStatus,
-        }));
-        setOrders(mapped);
+      if (tab === "active") {
+        const res = await ordersApi.deliveryAssignments();
+        if (res.success && res.data) {
+          const rawOrders = res.data as any[];
+          const mapped = rawOrders.map((o) => ({
+            id: o.id, // delivery ID for confirmPickup / confirmDelivery API calls
+            orderNumber: o.order.orderNumber,
+            status: o.status === "ASSIGNED" 
+              ? "ready" 
+              : o.status === "PICKED_UP" 
+                ? "out_for_delivery" 
+                : o.status.toLowerCase(),
+            createdAt: o.order.createdAt,
+            address: o.order.address,
+            specialInstructions: o.order.specialInstructions,
+            items: o.order.items,
+            paymentMethod: o.order.paymentMethod ? o.order.paymentMethod.toLowerCase() : "cod",
+            paymentStatus: o.order.paymentStatus ? o.order.paymentStatus.toLowerCase() : "pending",
+            total: o.order.total,
+            user: o.order.user,
+          })) as any[];
+          setOrders(mapped);
+        }
+      } else {
+        const res = await ordersApi.deliveryHistory(1, 50);
+        if (res.success && res.data) {
+          const rawHistory = (res.data as any).deliveries || res.data || [];
+          const mapped = rawHistory.map((o: any) => ({
+            id: o.id,
+            orderNumber: o.order.orderNumber,
+            status: "delivered", // historical deliveries are always delivered
+            createdAt: o.order.createdAt,
+            updatedAt: o.updatedAt,
+            address: o.order.address,
+            specialInstructions: o.order.specialInstructions,
+            items: o.order.items,
+            paymentMethod: o.order.paymentMethod ? o.order.paymentMethod.toLowerCase() : "cod",
+            paymentStatus: o.order.paymentStatus ? o.order.paymentStatus.toLowerCase() : "pending",
+            total: o.order.total,
+            user: o.order.user,
+          })) as any[];
+          setOrders(mapped);
+        }
       }
     } catch (err) {
-      console.error("Failed to fetch assignments:", err);
+      console.error("Failed to fetch deliveries:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAssignments();
-    // Poll every 5 seconds for live assignments
-    const interval = setInterval(fetchAssignments, 5000);
+    fetchDeliveries();
+    // Poll every 5 seconds for live updates
+    const interval = setInterval(fetchDeliveries, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [tab]);
 
   // Active deliveries: ready or out_for_delivery
   const activeDeliveries = orders
@@ -65,14 +98,14 @@ export default function DeliveryApp() {
       if (current === "ready") {
         const res = await ordersApi.confirmPickup(id);
         if (res.success) {
-          fetchAssignments();
+          fetchDeliveries();
         } else {
           alert("Failed to confirm pickup: " + (res.error || "Unknown error"));
         }
       } else if (current === "out_for_delivery") {
         const res = await ordersApi.confirmDelivery(id);
         if (res.success) {
-          fetchAssignments();
+          fetchDeliveries();
         } else {
           alert("Failed to confirm delivery: " + (res.error || "Unknown error"));
         }

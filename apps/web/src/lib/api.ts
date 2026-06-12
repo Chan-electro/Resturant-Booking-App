@@ -165,6 +165,9 @@ export const ordersApi = {
 
   confirmDelivery: (id: string, codCollected?: number) =>
     request(`/delivery/${id}/deliver`, { method: "PATCH", body: JSON.stringify({ codCollected }) }),
+
+  deliveryHistory: (page = 1, pageSize = 20) =>
+    request(`/delivery/history?page=${page}&pageSize=${pageSize}`),
 };
 
 // ===================== USERS =====================

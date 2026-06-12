@@ -97,6 +97,41 @@ export default function CustomerApp() {
     loadData();
   }, []);
 
+  // Preload user profile and default address
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const [profileRes, addrRes] = await Promise.all([
+          usersApi.profile(),
+          usersApi.addresses(),
+        ]);
+
+        if (profileRes.success && profileRes.data) {
+          const profile = profileRes.data as any;
+          if (profile.name) setName(profile.name);
+          if (profile.phone) setPhone(profile.phone);
+        }
+
+        if (addrRes.success && addrRes.data) {
+          const addresses = addrRes.data as any[];
+          const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
+          if (defaultAddress) {
+            setAddress({
+              street: defaultAddress.street || "",
+              city: defaultAddress.city || "Bangalore",
+              state: defaultAddress.state || "Karnataka",
+              zip: defaultAddress.zip || "",
+              instructions: defaultAddress.instructions || "",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to preload user profile/address:", err);
+      }
+    }
+    loadUserProfile();
+  }, []);
+
   // Load orders when view becomes "orders"
   useEffect(() => {
     if (view === "orders") {
@@ -609,41 +644,7 @@ export default function CustomerApp() {
               </div>
             </div>
 
-            <h2 className="text-xs font-bold text-maroon/60 uppercase tracking-widest mt-6 mb-2 pt-5 border-t border-ivory">
-              Payment Method
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setPayment("online")}
-                className={cn(
-                  "p-4 rounded-xl border flex flex-col items-center gap-2 transition-all",
-                  payment === "online"
-                    ? "bg-gold/10 border-gold text-maroon shadow-sm"
-                    : "bg-cream border-ivory text-maroon/60 hover:border-gold/50"
-                )}
-              >
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-ivory">
-                  💳
-                </div>
-                <span className="font-bold text-sm">Pay Online</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPayment("cod")}
-                className={cn(
-                  "p-4 rounded-xl border flex flex-col items-center gap-2 transition-all",
-                  payment === "cod"
-                    ? "bg-gold/10 border-gold text-maroon shadow-sm"
-                    : "bg-cream border-ivory text-maroon/60 hover:border-gold/50"
-                )}
-              >
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-ivory">
-                  💵
-                </div>
-                <span className="font-bold text-sm">Cash on Delivery</span>
-              </button>
-            </div>
+
 
             {/* Desktop Place Order Button */}
             <div className="hidden md:block mt-6">

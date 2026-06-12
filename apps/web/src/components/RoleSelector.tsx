@@ -54,7 +54,7 @@ export default function RoleSelector({
           <img
             src="/logo.png"
             alt="Brahma Kalasha"
-            className="h-20 w-auto mx-auto mb-6 drop-shadow-sm brightness-0"
+            className="h-20 w-auto mx-auto mb-6 drop-shadow-sm"
           />
           <p className="text-maroon/60 mt-2 font-medium text-lg">
             Premium Vegetarian Cuisine
