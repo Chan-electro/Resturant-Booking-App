@@ -61,6 +61,15 @@ export class DeliveryController {
     return { success: true, data: delivery };
   }
 
+  @Get('available')
+  @UseGuards(RolesGuard)
+  @Roles('DELIVERY', 'ADMIN')
+  @ApiOperation({ summary: 'Get available orders for delivery' })
+  async getAvailable() {
+    const orders = await this.deliveryService.getAvailableOrders();
+    return { success: true, data: orders };
+  }
+
   @Get(':id')
   @UseGuards(RolesGuard)
   @Roles('DELIVERY', 'ADMIN')
@@ -90,6 +99,15 @@ export class DeliveryController {
     @Body() dto: ConfirmDeliveryDto,
   ) {
     const delivery = await this.deliveryService.confirmDelivery(id, user.id, dto);
+    return { success: true, data: delivery };
+  }
+
+  @Patch(':id/accept')
+  @UseGuards(RolesGuard)
+  @Roles('DELIVERY', 'ADMIN')
+  @ApiOperation({ summary: 'Accept delivery assignment' })
+  async acceptDelivery(@CurrentUser() user: any, @Param('id') orderId: string) {
+    const delivery = await this.deliveryService.acceptDelivery(orderId, user.id);
     return { success: true, data: delivery };
   }
 }

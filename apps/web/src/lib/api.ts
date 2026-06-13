@@ -161,6 +161,10 @@ export const ordersApi = {
 
   deliveryAssignments: () => request("/delivery/assignments"),
 
+  availableDeliveries: () => request("/delivery/available"),
+
+  acceptDelivery: (id: string) => request(`/delivery/${id}/accept`, { method: "PATCH" }),
+
   confirmPickup: (id: string) => request(`/delivery/${id}/pickup`, { method: "PATCH" }),
 
   confirmDelivery: (id: string, codCollected?: number) =>

@@ -267,4 +267,79 @@ export class DeliveryService {
 
     return delivery;
   }
+
+  async getAvailableOrders() {
+    return this.prisma.order.findMany({
+      where: {
+        status: 'READY',
+        delivery: null,
+      },
+      include: {
+        items: true,
+        address: true,
+        user: { select: { id: true, name: true, phone: true } },
+      },
+      orderBy: { updatedAt: 'asc' },
+    });
+  }
+
+  async acceptDelivery(orderId: string, driverId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status !== 'READY') {
+      throw new BadRequestException('Order is not ready for delivery');
+    }
+
+    const driver = await this.prisma.user.findFirst({
+      where: { id: driverId, role: 'DELIVERY', isActive: true },
+    });
+    if (!driver) throw new NotFoundException('Driver not found or inactive');
+
+    const delivery = await this.prisma.$transaction(async (tx: any) => {
+      const existingDelivery = await tx.delivery.findFirst({
+        where: { orderId },
+      });
+
+      let newDelivery;
+      if (existingDelivery) {
+        newDelivery = await tx.delivery.update({
+          where: { id: existingDelivery.id },
+          data: { driverId, status: 'ASSIGNED' },
+          include: { order: true, driver: { select: { id: true, name: true, phone: true } } },
+        });
+      } else {
+        newDelivery = await tx.delivery.create({
+          data: {
+            orderId,
+            driverId,
+            status: 'ASSIGNED',
+          },
+          include: { order: true, driver: { select: { id: true, name: true, phone: true } } },
+        });
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: 'ASSIGNED' },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId,
+          status: 'ASSIGNED',
+          changedBy: driverId,
+          note: `Accepted by driver ${driver.name}`,
+        },
+      });
+
+      return newDelivery;
+    });
+
+    this.gateway.emitOrderStatusUpdate(orderId, 'ASSIGNED', order.userId);
+    this.gateway.emitDeliveryUpdate(delivery.id, { status: 'ASSIGNED', orderId });
+
+    return delivery;
+  }
 }
