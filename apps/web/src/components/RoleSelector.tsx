@@ -52,8 +52,8 @@ export default function RoleSelector({
         {/* Logo & Title */}
         <div className="text-center mb-10 animate-fade-in">
           <img
-            src="/logo.png"
-            alt="Brahma Kalasha"
+            src="/brand/ms-brahmin-events-primary.png"
+            alt="MS Brahmin Events"
             className="h-20 w-auto mx-auto mb-6 drop-shadow-sm"
           />
           <p className="text-maroon/60 mt-2 font-medium text-lg">

@@ -1,4 +1,4 @@
-// Brahma Kalasha — Mock Data for Development
+// MS Brahmin Events — Mock Data for Development
 // This data mirrors the database schema and will be replaced by API calls
 
 import type {

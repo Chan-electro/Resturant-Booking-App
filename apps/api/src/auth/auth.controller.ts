@@ -8,6 +8,7 @@ import {
   Req,
   Res,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -46,6 +47,26 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.login(loginDto);
+    this.setTokenCookies(req, res, result.accessToken, result.refreshToken);
+    return { success: true, data: result };
+  }
+
+  @Post('clerk/exchange')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Exchange a verified Clerk session for application tokens' })
+  async exchangeClerkSession(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const authorization = req.headers.authorization;
+    if (!authorization?.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Clerk bearer token is required');
+    }
+
+    const result = await this.authService.exchangeClerkToken(
+      authorization.slice('Bearer '.length),
+    );
     this.setTokenCookies(req, res, result.accessToken, result.refreshToken);
     return { success: true, data: result };
   }

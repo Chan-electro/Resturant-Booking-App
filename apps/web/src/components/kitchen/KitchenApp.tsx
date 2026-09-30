@@ -15,6 +15,7 @@ import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/typ
 import { cn, formatTime, getStatusLabel } from "@/lib/utils";
 import { ordersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
+import { useOrderRealtime } from "@/lib/use-order-realtime";
 
 type KitchenFilter = "all" | "pending" | "preparing" | "ready";
 
@@ -46,10 +47,9 @@ export default function KitchenApp() {
 
   useEffect(() => {
     fetchQueue();
-    // Poll every 5 seconds for live orders
-    const interval = setInterval(fetchQueue, 5000);
-    return () => clearInterval(interval);
   }, []);
+
+  useOrderRealtime(fetchQueue);
 
   // Kitchen sees orders that are confirmed/placed, preparing, or ready
   const kitchenStatuses: OrderStatus[] = ["placed", "confirmed", "preparing", "ready"];
@@ -138,7 +138,7 @@ export default function KitchenApp() {
               <ChefHat className="w-7 h-7 text-gold" />
             </div>
             <div>
-              <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto brightness-0 invert mb-0.5" />
+              <img src="/brand/wordmark-white.svg" alt="MS Brahmin Events" className="h-7 w-auto mb-0.5" />
               <p className="text-sm text-cream/70 mt-0.5">
                 Production KDS
               </p>

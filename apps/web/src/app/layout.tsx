@@ -1,24 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Manrope } from "next/font/google";
+import localFont from "next/font/local";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
+import { isClerkConfigured } from "@/lib/auth-mode";
 
-const inter = Inter({
-  subsets: ["latin"],
+const bodyFont = localFont({
+  src: [
+    { path: "./fonts/DejaVuSans.ttf", weight: "400" },
+    { path: "./fonts/DejaVuSans-Bold.ttf", weight: "700" },
+  ],
   variable: "--font-inter",
   display: "swap",
 });
 
-const manrope = Manrope({
-  subsets: ["latin"],
+const displayFont = localFont({
+  src: [
+    { path: "./fonts/DejaVuSerif.ttf", weight: "400" },
+    { path: "./fonts/DejaVuSerif-Bold.ttf", weight: "700" },
+  ],
   variable: "--font-manrope",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Brahma Kalasha — Premium Vegetarian Pre-Order Platform",
+  title: "MS Brahmin Events — Event Management & Home Catering",
   description:
-    "Order freshly prepared wholesome vegetarian meals for next-day delivery. South Indian tiffins, veg lunches, healthy specials and more. Pre-order before 9 PM tonight for tomorrow's delivery.",
+    "Plan memorable celebrations and order thoughtfully prepared vegetarian catering from MS Brahmin Events.",
   keywords: [
     "vegetarian food",
     "pre-order meals",
@@ -26,16 +34,18 @@ export const metadata: Metadata = {
     "south indian food",
     "tiffin service",
     "Bangalore food delivery",
-    "Brahma Kalasha",
+    "event management",
+    "home catering",
+    "MS Brahmin Events",
   ],
-  authors: [{ name: "Brahma Kalasha" }],
+  authors: [{ name: "MS Brahmin Events" }],
   openGraph: {
-    title: "Brahma Kalasha — Premium Vegetarian Pre-Order Platform",
+    title: "MS Brahmin Events — Event Management & Home Catering",
     description:
-      "Order freshly prepared wholesome vegetarian meals for next-day delivery.",
+      "Warm, dependable event management and vegetarian home catering.",
     type: "website",
     locale: "en_IN",
-    siteName: "Brahma Kalasha",
+    siteName: "MS Brahmin Events",
   },
 };
 
@@ -43,7 +53,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#4B0F16",
+  themeColor: "#7B1825",
 };
 
 // Force dynamic rendering for all pages – prevents Next.js from serving
@@ -56,9 +66,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${manrope.variable}`}>
+    <html lang="en" className={`${bodyFont.variable} ${displayFont.variable}`}>
       <body className="min-h-screen bg-cream text-maroon font-sans antialiased">
-        <AppProvider>{children}</AppProvider>
+        {isClerkConfigured ? (
+          <ClerkProvider>
+            <AppProvider>{children}</AppProvider>
+          </ClerkProvider>
+        ) : (
+          <AppProvider>{children}</AppProvider>
+        )}
       </body>
     </html>
   );

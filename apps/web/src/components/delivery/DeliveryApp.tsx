@@ -22,6 +22,7 @@ import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/typ
 import { cn, formatPrice, formatTime, getStatusLabel } from "@/lib/utils";
 import { ordersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
+import { useOrderRealtime } from "@/lib/use-order-realtime";
 
 type DeliveryTab = "available" | "active" | "history";
 
@@ -110,10 +111,9 @@ export default function DeliveryApp() {
 
   useEffect(() => {
     fetchData();
-    // Poll every 5 seconds for live status updates
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
   }, []);
+
+  useOrderRealtime(fetchData);
 
   const claimJob = async (orderId: string) => {
     try {
@@ -200,7 +200,7 @@ export default function DeliveryApp() {
                 <Package className="w-5 h-5 text-gold" />
               </div>
               <div>
-                <img src="/logo.png" alt="Brahma Kalasha" className="h-6 w-auto brightness-0 invert mb-0.5" />
+                <img src="/brand/wordmark-white.svg" alt="MS Brahmin Events" className="h-6 w-auto mb-0.5" />
                 <p className="text-xs text-cream/70 font-semibold tracking-wider uppercase">
                   Courier Dashboard
                 </p>
@@ -324,7 +324,7 @@ export default function DeliveryApp() {
                         </div>
                         <div>
                           <p className="text-xs text-maroon/50 font-bold uppercase tracking-wider">Pickup From</p>
-                          <p className="text-sm font-bold text-maroon mt-0.5">Brahma Kalasha Kitchen</p>
+                          <p className="text-sm font-bold text-maroon mt-0.5">MS Brahmin Events Kitchen</p>
                           <p className="text-xs text-maroon/65">Main Road, Temple Lane</p>
                         </div>
                       </div>

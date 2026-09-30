@@ -19,9 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') ||
-        'brahma-kalasha-super-secret-jwt-key-change-in-production',
+      secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 

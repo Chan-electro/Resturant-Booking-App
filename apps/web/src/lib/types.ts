@@ -1,4 +1,4 @@
-// Brahma Kalasha — Frontend Types
+// MS Brahmin Events — Frontend Types
 // Re-exports shared types and adds frontend-specific types
 
 // ===================== ENUMS =====================

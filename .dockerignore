@@ -1,0 +1,14 @@
+.git
+.github
+.next
+**/.next
+**/dist
+**/node_modules
+.env
+.env.*
+!.env.example
+coverage
+.tmp-brand-kit
+*.log
+*.md
+!README.md
