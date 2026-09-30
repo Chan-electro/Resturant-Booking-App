@@ -2,13 +2,7 @@ const getApiBase = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
-      return `http://${hostname}:3001/api/v1`;
-    }
-  }
-  return "http://localhost:3001/api/v1";
+  return "/api/v1";
 };
 
 const API_BASE = getApiBase();
@@ -33,50 +27,13 @@ async function request<T>(
     },
   });
 
-  if (res.status === 401) {
-    // Try refresh
-    const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (refreshRes.ok) {
-      // Retry original request
-      const retryRes = await fetch(`${API_BASE}${path}`, {
-        ...options,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
-      });
-      return retryRes.json();
-    }
-    return { success: false, error: "Unauthorized" };
-  }
-
-  return res.json();
+  return res.json().catch(() => ({ success: false, error: "Invalid server response" }));
 }
 
 // ===================== AUTH =====================
 
 export const authApi = {
-  register: (data: { name: string; email: string; password: string; phone?: string }) =>
-    request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
-
-  login: (data: { email: string; password: string }) =>
-    request("/auth/login", { method: "POST", body: JSON.stringify(data) }),
-
-  logout: () => request("/auth/logout", { method: "POST" }),
-
   me: () => request("/auth/me"),
-
-  forgotPassword: (email: string) =>
-    request("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
-
-  resetPassword: (token: string, newPassword: string) =>
-    request("/auth/reset-password", { method: "POST", body: JSON.stringify({ token, newPassword }) }),
-
-  googleUrl: () => `${API_BASE}/auth/google`,
 };
 
 // ===================== MENU =====================

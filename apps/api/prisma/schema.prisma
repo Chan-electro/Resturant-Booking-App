@@ -1,4 +1,4 @@
-// Brahma Kalasha — Prisma Schema
+// MS Brahmin Events — Prisma Schema
 // Production database schema for the vegetarian pre-order platform
 
 generator client {
@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ===================== AUTH & USERS =====================
@@ -16,6 +17,7 @@ model User {
   id            String    @id @default(cuid())
   name          String
   email         String    @unique
+  clerkId       String?   @unique
   emailVerified DateTime?
   phone         String?   @unique
   passwordHash  String?
@@ -23,7 +25,7 @@ model User {
   avatarUrl     String?
   isActive      Boolean   @default(true)
 
-  // Auth.js fields
+  // Authentication and session fields
   accounts Account[]
   sessions Session[]
 

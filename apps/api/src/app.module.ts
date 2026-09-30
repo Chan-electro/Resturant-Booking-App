@@ -16,12 +16,15 @@ import { SettingsModule } from './settings/settings.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { HealthModule } from './health/health.module';
+import { validateEnvironment } from './config/validate-env';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnvironment,
     }),
     ThrottlerModule.forRoot([
       {
@@ -31,6 +34,7 @@ import { GatewayModule } from './gateway/gateway.module';
     ]),
     PrismaModule,
     GatewayModule,
+    HealthModule,
     AuthModule,
     UsersModule,
     MenuModule,

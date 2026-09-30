@@ -51,7 +51,7 @@ export default function CustomerApp() {
     zip: "",
     instructions: "",
   });
-  const [payment, setPayment] = useState<"cod" | "online">("online");
+  const [payment, setPayment] = useState<"cod" | "online">("cod");
 
   // Load menu and categories on mount
   useEffect(() => {
@@ -202,7 +202,7 @@ export default function CustomerApp() {
       key: razorpayData.key,
       amount: razorpayData.amount,
       currency: razorpayData.currency,
-      name: "Brahma Kalasha",
+      name: "MS Brahmin Events",
       description: "Pre-order Vegetarian Meal",
       order_id: razorpayData.id,
       handler: async function (response: any) {
@@ -695,8 +695,8 @@ export default function CustomerApp() {
 
         <div className="flex justify-between items-center mb-8 relative z-10">
           <img
-            src="/logo.png"
-            alt="Brahma Kalasha"
+            src="/brand/wordmark-white.svg"
+            alt="MS Brahmin Events"
             className="h-8 w-auto brightness-0 invert"
           />
           <div className="flex items-center gap-2">

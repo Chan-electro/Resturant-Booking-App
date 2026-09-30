@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 
 @Injectable()
 export class AuthService {
@@ -86,6 +87,92 @@ export class AuthService {
       ...tokens,
       user: this.sanitizeUser(user),
     };
+  }
+
+  async exchangeClerkToken(token: string) {
+    const secretKey = this.configService.get<string>('CLERK_SECRET_KEY');
+    if (!secretKey) {
+      throw new UnauthorizedException('Clerk authentication is not configured');
+    }
+
+    const authorizedParties = this.configService
+      .get<string>('CLERK_AUTHORIZED_PARTIES')
+      ?.split(',')
+      .map((party) => party.trim())
+      .filter(Boolean);
+
+    let clerkUserId: string;
+    try {
+      const payload = await verifyToken(token, {
+        secretKey,
+        ...(authorizedParties?.length ? { authorizedParties } : {}),
+      });
+      clerkUserId = payload.sub;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Clerk session');
+    }
+
+    const clerk = createClerkClient({ secretKey });
+    const clerkUser = await clerk.users.getUser(clerkUserId);
+    const primaryEmail = clerkUser.emailAddresses.find(
+      (entry) => entry.id === clerkUser.primaryEmailAddressId,
+    );
+
+    if (
+      !primaryEmail?.emailAddress ||
+      primaryEmail.verification?.status !== 'verified'
+    ) {
+      throw new UnauthorizedException('A verified email address is required');
+    }
+
+    const email = primaryEmail.emailAddress.toLowerCase();
+    const name =
+      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') ||
+      clerkUser.username ||
+      email.split('@')[0];
+
+    const [userByClerkId, userByEmail] = await Promise.all([
+      this.prisma.user.findUnique({ where: { clerkId: clerkUserId } }),
+      this.prisma.user.findUnique({ where: { email } }),
+    ]);
+    if (userByClerkId && userByEmail && userByClerkId.id !== userByEmail.id) {
+      throw new ConflictException('Clerk identity and email belong to different accounts');
+    }
+    let user = userByClerkId || userByEmail;
+
+    if (user) {
+      if (!user.isActive) {
+        throw new UnauthorizedException('Account is disabled');
+      }
+      if (user.clerkId && user.clerkId !== clerkUserId) {
+        throw new ConflictException('This email is linked to another identity');
+      }
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          clerkId: clerkUserId,
+          name,
+          avatarUrl: clerkUser.imageUrl || user.avatarUrl,
+          emailVerified: user.emailVerified || new Date(),
+        },
+      });
+    } else {
+      user = await this.prisma.user.create({
+        data: {
+          clerkId: clerkUserId,
+          email,
+          name,
+          avatarUrl: clerkUser.imageUrl,
+          emailVerified: new Date(),
+          role: 'CUSTOMER',
+        },
+      });
+    }
+
+    const tokens = await this.generateTokens(user);
+    await this.storeRefreshToken(user.id, tokens.refreshToken);
+
+    return { ...tokens, user: this.sanitizeUser(user) };
   }
 
   async refreshTokens(userId: string, refreshToken: string) {
@@ -163,9 +250,7 @@ export class AuthService {
     if (accessToken) {
       try {
         const decoded = await this.jwtService.verifyAsync(accessToken, {
-          secret:
-            this.configService.get<string>('JWT_SECRET') ||
-            'brahma-kalasha-super-secret-jwt-key',
+          secret: this.configService.getOrThrow<string>('JWT_SECRET'),
         });
         userId = decoded.sub;
       } catch (err) {
@@ -176,9 +261,7 @@ export class AuthService {
     if (!userId && refreshToken) {
       try {
         const decoded = await this.jwtService.verifyAsync(refreshToken, {
-          secret:
-            this.configService.get<string>('JWT_REFRESH_SECRET') ||
-            'brahma-kalasha-refresh-secret',
+          secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
         });
         userId = decoded.sub;
       } catch (err) {
@@ -219,8 +302,10 @@ export class AuthService {
       },
     });
 
-    // In production, send email here
-    console.log(`Password reset token for ${email}: ${token}`);
+    // Until an email provider is connected, expose reset tokens only in local logs.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`Password reset token for ${email}: ${token}`);
+    }
 
     return { message: 'If that email exists, a reset link has been sent.' };
   }
@@ -270,12 +355,8 @@ export class AuthService {
   private async generateTokens(user: any) {
     const payload = { sub: user.id, email: user.email, role: user.role };
 
-    const accessSecret =
-      this.configService.get<string>('JWT_SECRET') ||
-      'brahma-kalasha-super-secret-jwt-key';
-    const refreshSecret =
-      this.configService.get<string>('JWT_REFRESH_SECRET') ||
-      'brahma-kalasha-refresh-secret';
+    const accessSecret = this.configService.getOrThrow<string>('JWT_SECRET');
+    const refreshSecret = this.configService.getOrThrow<string>('JWT_REFRESH_SECRET');
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {

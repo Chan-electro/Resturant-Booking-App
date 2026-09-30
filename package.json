@@ -11,10 +11,12 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:all": "npm run dev --workspaces --if-present",
     "build": "npm run db:generate && npm run build --workspaces --if-present",
+    "build:web": "npm run db:generate && npm run build --workspace=apps/web",
     "lint": "npm run lint --workspaces --if-present",
     "db:generate": "npm run generate --workspace=packages/prisma",
     "db:push": "npm run push --workspace=packages/prisma",
     "db:migrate": "npm run migrate --workspace=packages/prisma",
+    "db:migrate:deploy": "npm run db:migrate --workspace=apps/api",
     "db:seed": "npm run seed --workspace=packages/prisma",
     "db:studio": "npm run studio --workspace=packages/prisma",
     "api:install": "npm install --workspace=apps/api",
@@ -22,6 +24,11 @@
     "db:seed:api": "npm run db:seed --workspace=apps/api"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.13.0"
+  },
+  "overrides": {
+    "@nestjs/swagger@11.4.7": {
+      "js-yaml": "5.4.2"
+    }
   }
 }

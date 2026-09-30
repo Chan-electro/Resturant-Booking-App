@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
   User,
   ChefHat,
@@ -13,9 +12,22 @@ import {
   UserCircle,
 } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { authApi } from "@/lib/api";
 import type { UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useClerk } from "@clerk/nextjs";
+
+function ClerkSignOutButton({ onSignedOut }: { onSignedOut: () => void }) {
+  const { signOut } = useClerk();
+  const handleSignOut = async () => {
+    await signOut({ redirectUrl: "/login" });
+    onSignedOut();
+  };
+  return (
+    <button onClick={handleSignOut} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 transition-all text-left mt-0.5">
+      <LogOut className="w-4 h-4 text-red-400" /><span>Sign Out</span>
+    </button>
+  );
+}
 
 interface ProfileDropdownProps {
   align?: "left" | "right";
@@ -28,7 +40,6 @@ export default function ProfileDropdown({
   onSettingsClick,
   theme = "light",
 }: ProfileDropdownProps) {
-  const router = useRouter();
   const { state, dispatch } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -43,17 +54,6 @@ export default function ProfileDropdown({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleLogout = async () => {
-    setIsOpen(false);
-    try {
-      await authApi.logout();
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
-    dispatch({ type: "SET_ROLE", payload: null });
-    router.push("/login");
-  };
 
   const handleRoleSelect = (role: UserRole) => {
     dispatch({ type: "SET_ROLE", payload: role });
@@ -180,13 +180,7 @@ export default function ProfileDropdown({
                 <span>Settings</span>
               </button>
             )}
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 transition-all text-left mt-0.5"
-            >
-              <LogOut className="w-4 h-4 text-red-400" />
-              <span>Sign Out</span>
-            </button>
+            <ClerkSignOutButton onSignedOut={() => dispatch({ type: "SET_ROLE", payload: null })} />
           </div>
         </div>
       )}

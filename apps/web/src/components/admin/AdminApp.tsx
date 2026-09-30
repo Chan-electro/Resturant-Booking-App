@@ -36,6 +36,7 @@ import { cn, formatPrice, getStatusColor, formatDate, formatTime } from "@/lib/u
 import { adminApi, analyticsApi, menuApi, ordersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import { useApp } from "@/lib/store";
+import { useOrderRealtime } from "@/lib/use-order-realtime";
 
 type AdminPage = "dashboard" | "menu" | "orders" | "customers" | "analytics" | "settings";
 
@@ -381,6 +382,8 @@ export default function AdminApp() {
     fetchData();
   }, []);
 
+  useOrderRealtime(fetchData);
+
   const handleSaveSetting = async (key: string, value: string) => {
     try {
       setSavingSettings(true);
@@ -423,7 +426,7 @@ export default function AdminApp() {
       <aside className="w-64 bg-maroon text-cream flex-col hidden lg:flex shrink-0 sticky top-0 h-screen">
         <div className="p-6 border-b border-ivory/10">
           <div className="flex items-center gap-2.5 mb-2">
-            <img src="/logo.png" alt="Brahma Kalasha" className="h-8 w-auto brightness-0 invert" />
+            <img src="/brand/wordmark-white.svg" alt="MS Brahmin Events" className="h-8 w-auto" />
           </div>
           <p className="text-sm text-gold/80 font-medium">Admin Console</p>
         </div>
@@ -477,7 +480,7 @@ export default function AdminApp() {
         {/* Top Bar */}
         <header className="bg-white border-b border-ivory p-4 lg:p-6 flex justify-between items-center sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-3 lg:hidden">
-            <img src="/logo.png" alt="Brahma Kalasha" className="h-7 w-auto" />
+            <img src="/brand/wordmark-maroon.svg" alt="MS Brahmin Events" className="h-7 w-auto" />
             <h2 className="text-lg font-bold text-maroon font-display">
               {navItems.find((n) => n.id === activePage)?.label}
             </h2>
