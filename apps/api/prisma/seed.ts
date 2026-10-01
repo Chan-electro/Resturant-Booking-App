@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -23,49 +22,6 @@ async function main() {
     });
   }
   console.log('Settings seeded.');
-
-  // ===================== USERS =====================
-  const adminHash = await bcrypt.hash('Admin@123', 12);
-  const kitchenHash = await bcrypt.hash('Kitchen@123', 12);
-  const deliveryHash = await bcrypt.hash('Delivery@123', 12);
-
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@brahmakalasha.com' },
-    create: {
-      name: 'Admin User',
-      email: 'admin@brahmakalasha.com',
-      passwordHash: adminHash,
-      role: 'ADMIN',
-      isActive: true,
-    },
-    update: { passwordHash: adminHash, role: 'ADMIN' },
-  });
-
-  const kitchen = await prisma.user.upsert({
-    where: { email: 'kitchen@brahmakalasha.com' },
-    create: {
-      name: 'Kitchen Staff',
-      email: 'kitchen@brahmakalasha.com',
-      passwordHash: kitchenHash,
-      role: 'KITCHEN',
-      isActive: true,
-    },
-    update: { passwordHash: kitchenHash, role: 'KITCHEN' },
-  });
-
-  const delivery = await prisma.user.upsert({
-    where: { email: 'delivery@brahmakalasha.com' },
-    create: {
-      name: 'Delivery Driver',
-      email: 'delivery@brahmakalasha.com',
-      passwordHash: deliveryHash,
-      role: 'DELIVERY',
-      isActive: true,
-    },
-    update: { passwordHash: deliveryHash, role: 'DELIVERY' },
-  });
-
-  console.log('Users seeded:', admin.email, kitchen.email, delivery.email);
 
   // ===================== CATEGORIES =====================
   const categories = [
@@ -112,7 +68,11 @@ async function main() {
     const created = await prisma.category.upsert({
       where: { slug: cat.slug },
       create: { ...cat, isActive: true },
-      update: { name: cat.name, description: cat.description, sortOrder: cat.sortOrder },
+      update: {
+        name: cat.name,
+        description: cat.description,
+        sortOrder: cat.sortOrder,
+      },
     });
     categoryMap[cat.slug] = created.id;
   }
@@ -124,9 +84,11 @@ async function main() {
       categorySlug: 'south-indian-tiffins',
       name: 'Masala Dosa',
       slug: 'masala-dosa',
-      description: 'Crispy golden dosa filled with spiced potato masala, served with coconut chutney and sambar',
+      description:
+        'Crispy golden dosa filled with spiced potato masala, served with coconut chutney and sambar',
       price: 80,
-      imageUrl: 'https://images.unsplash.com/photo-1630383249896-424e482df921?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1630383249896-424e482df921?w=400',
       isHealthy: false,
       sortOrder: 1,
     },
@@ -134,9 +96,11 @@ async function main() {
       categorySlug: 'south-indian-tiffins',
       name: 'Idli Sambar',
       slug: 'idli-sambar',
-      description: 'Soft steamed rice cakes served with flavorful sambar and fresh coconut chutney',
+      description:
+        'Soft steamed rice cakes served with flavorful sambar and fresh coconut chutney',
       price: 60,
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=400',
       isHealthy: true,
       sortOrder: 2,
     },
@@ -146,7 +110,8 @@ async function main() {
       slug: 'medu-vada',
       description: 'Crispy lentil donuts served with sambar and chutneys',
       price: 50,
-      imageUrl: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400',
       isHealthy: false,
       sortOrder: 3,
     },
@@ -154,9 +119,11 @@ async function main() {
       categorySlug: 'south-indian-veg-lunches',
       name: 'South Indian Thali',
       slug: 'south-indian-thali',
-      description: 'Complete thali with rice, sambar, rasam, kootu, pickle, papad, and dessert',
+      description:
+        'Complete thali with rice, sambar, rasam, kootu, pickle, papad, and dessert',
       price: 150,
-      imageUrl: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400',
       isHealthy: true,
       sortOrder: 1,
     },
@@ -164,9 +131,11 @@ async function main() {
       categorySlug: 'south-indian-veg-lunches',
       name: 'Curd Rice',
       slug: 'curd-rice',
-      description: 'Comforting yogurt rice tempered with mustard seeds, curry leaves, and green chilies',
+      description:
+        'Comforting yogurt rice tempered with mustard seeds, curry leaves, and green chilies',
       price: 70,
-      imageUrl: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400',
       isHealthy: true,
       sortOrder: 2,
     },
@@ -174,9 +143,11 @@ async function main() {
       categorySlug: 'indian-veg-chaats',
       name: 'Pani Puri',
       slug: 'pani-puri',
-      description: 'Crispy hollow puris filled with spiced water, chickpeas, and chutneys',
+      description:
+        'Crispy hollow puris filled with spiced water, chickpeas, and chutneys',
       price: 60,
-      imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400',
       isHealthy: false,
       sortOrder: 1,
     },
@@ -184,9 +155,11 @@ async function main() {
       categorySlug: 'indian-veg-chaats',
       name: 'Bhel Puri',
       slug: 'bhel-puri',
-      description: 'Puffed rice mixed with vegetables, chutneys and sev for a delightful crunch',
+      description:
+        'Puffed rice mixed with vegetables, chutneys and sev for a delightful crunch',
       price: 50,
-      imageUrl: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=400',
       isHealthy: false,
       sortOrder: 2,
     },
@@ -194,9 +167,11 @@ async function main() {
       categorySlug: 'indian-sweets',
       name: 'Gulab Jamun',
       slug: 'gulab-jamun',
-      description: 'Soft milk-solid balls soaked in rose-flavored sugar syrup, served warm',
+      description:
+        'Soft milk-solid balls soaked in rose-flavored sugar syrup, served warm',
       price: 40,
-      imageUrl: 'https://images.unsplash.com/photo-1666385778718-e18de7ebe62c?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1666385778718-e18de7ebe62c?w=400',
       isHealthy: false,
       sortOrder: 1,
     },
@@ -204,9 +179,11 @@ async function main() {
       categorySlug: 'indian-sweets',
       name: 'Kheer',
       slug: 'kheer',
-      description: 'Creamy rice pudding slow-cooked with milk, sugar, cardamom, and dry fruits',
+      description:
+        'Creamy rice pudding slow-cooked with milk, sugar, cardamom, and dry fruits',
       price: 60,
-      imageUrl: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400',
       isHealthy: false,
       sortOrder: 2,
     },
@@ -214,9 +191,11 @@ async function main() {
       categorySlug: 'healthy-specials',
       name: 'Sprouts Salad',
       slug: 'sprouts-salad',
-      description: 'Fresh mixed sprouts with cucumber, tomato, lemon, and spices',
+      description:
+        'Fresh mixed sprouts with cucumber, tomato, lemon, and spices',
       price: 70,
-      imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400',
       isHealthy: true,
       sortOrder: 1,
     },
@@ -224,9 +203,11 @@ async function main() {
       categorySlug: 'healthy-specials',
       name: 'Quinoa Upma',
       slug: 'quinoa-upma',
-      description: 'Protein-rich quinoa cooked with vegetables and South Indian spices',
+      description:
+        'Protein-rich quinoa cooked with vegetables and South Indian spices',
       price: 120,
-      imageUrl: 'https://images.unsplash.com/photo-1546833998-877b37c2e5c6?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1546833998-877b37c2e5c6?w=400',
       isHealthy: true,
       sortOrder: 2,
     },
@@ -234,9 +215,11 @@ async function main() {
       categorySlug: 'seasonal-specials',
       name: 'Mango Lassi',
       slug: 'mango-lassi',
-      description: 'Refreshing yogurt drink blended with fresh Alphonso mangoes',
+      description:
+        'Refreshing yogurt drink blended with fresh Alphonso mangoes',
       price: 80,
-      imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400',
+      imageUrl:
+        'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400',
       isHealthy: false,
       sortOrder: 1,
     },
@@ -286,9 +269,9 @@ async function main() {
   console.log(`Daily menu seeded for ${tomorrow.toDateString()}.`);
 
   console.log('\n=== Seed Complete ===');
-  console.log('Admin: admin@brahmakalasha.com / Admin@123');
-  console.log('Kitchen: kitchen@brahmakalasha.com / Kitchen@123');
-  console.log('Delivery: delivery@brahmakalasha.com / Delivery@123');
+  console.log(
+    'No users were seeded. Clerk creates users on their first authenticated request.',
+  );
   console.log(`Daily menu available for: ${tomorrow.toDateString()}`);
 }
 
