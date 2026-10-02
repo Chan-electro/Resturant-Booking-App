@@ -52,6 +52,19 @@ Restart the web app after changing the environment file. The checkout then
 offers **Pay online** and creates Razorpay orders in test mode. Do not commit
 the real test secret; `.env.local` is ignored by Git.
 
+If a Razorpay test account is not available, local/demo environments can use
+the built-in payment simulator instead:
+
+```env
+RAZORPAY_KEY_ID=""
+RAZORPAY_KEY_SECRET=""
+RAZORPAY_MOCK_MODE="true"
+```
+
+Mock mode exercises order creation, payment confirmation, notifications, and
+the customer success screen without calling Razorpay. Never enable it for a
+real production deployment.
+
 ## Deployment
 
 Production uses Vercel for the Next.js application, Supabase for PostgreSQL and Realtime, and Clerk for authentication. The NestJS workspace is retained only as migration/legacy reference and does not need a production host. Follow [the deployment guide](docs/SETUP_VERCEL_SUPABASE_CLERK.md).

@@ -221,6 +221,23 @@ export default function CustomerApp() {
   };
 
   const handleRazorpayPayment = async (orderId: string, razorpayData: any) => {
+    if (razorpayData.mock === true) {
+      const confirmed = confirm("Test payment mode is active. Simulate a successful online payment?");
+      if (!confirmed) {
+        setView("orders");
+        return;
+      }
+      const response = await ordersApi.confirmTestPayment(orderId);
+      if (response.success) {
+        setLastPlacedOrder((order) => order ? { ...order, paymentStatus: "paid", status: "confirmed" } : order);
+        setView("success");
+      } else {
+        alert(response.error || "Unable to confirm the test payment");
+        setView("orders");
+      }
+      return;
+    }
+
     const loaded = await loadRazorpayScript();
     if (!loaded) {
       alert("Failed to load Razorpay SDK. Please check your internet connection.");
