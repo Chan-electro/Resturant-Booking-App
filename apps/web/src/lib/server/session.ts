@@ -39,7 +39,6 @@ export async function requireAppUser(): Promise<User> {
     ? await prisma.user.update({
         where: { id: existing.id },
         data: {
-          name,
           email: primaryEmail.toLowerCase(),
           avatarUrl: clerkUser.imageUrl,
           emailVerified: clerkUser.primaryEmailAddress?.verification?.status === "verified" ? new Date() : existing.emailVerified,
@@ -48,7 +47,7 @@ export async function requireAppUser(): Promise<User> {
       })
     : await prisma.user.upsert({
         where: { email: primaryEmail.toLowerCase() },
-        update: { clerkId: clerkUser.id, name, avatarUrl: clerkUser.imageUrl },
+        update: { clerkId: clerkUser.id, avatarUrl: clerkUser.imageUrl },
         create: {
           clerkId: clerkUser.id,
           name,

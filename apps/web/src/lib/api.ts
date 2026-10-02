@@ -152,6 +152,8 @@ export const usersApi = {
     zip: string;
     instructions?: string;
     isDefault?: boolean;
+    lat?: number;
+    lng?: number;
   }) => request("/users/addresses", { method: "POST", body: JSON.stringify(data) }),
   deleteAddress: (id: string) => request(`/users/addresses/${id}`, { method: "DELETE" }),
 };
