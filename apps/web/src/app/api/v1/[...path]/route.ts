@@ -241,7 +241,7 @@ async function dispatch(request: NextRequest, segments: string[]) {
         userId: user.id,
         ...values,
       } });
-    });
+    }, { maxWait: 10000, timeout: 15000 });
     return ok(address);
   }
 
@@ -303,8 +303,12 @@ async function dispatch(request: NextRequest, segments: string[]) {
         });
         if (claimed.count !== 1) throw new ApiError("This coupon has reached its usage limit", 409);
       }
+      const availabilityRows = await tx.dailyMenu.findMany({ where: {
+        date: deliveryDate,
+        menuItemId: { in: rows.map((item) => item.menuItemId) },
+      } });
       for (const item of rows) {
-        const availability = await tx.dailyMenu.findUnique({ where: { date_menuItemId: { date: deliveryDate, menuItemId: item.menuItemId } } });
+        const availability = availabilityRows.find((entry) => entry.menuItemId === item.menuItemId);
         if (!availability?.isAvailable || availability.remainingQty < item.quantity) throw new ApiError(`${item.name} is unavailable for the selected date`);
       }
       const created = await tx.order.create({ data: {
@@ -322,7 +326,7 @@ async function dispatch(request: NextRequest, segments: string[]) {
       }
       await tx.notification.create({ data: { userId: user.id, title: "Order placed", body: `Order #${orderNumber} has been received.`, type: "ORDER_CONFIRMATION", data: { orderId: created.id } } });
       return created;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
     if (!onlinePayment) return ok(order);
     if (mockPayment) return ok({ order, razorpay: { mock: true } });
     const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}` }, body: JSON.stringify({ amount: Math.round(total * 100), currency: "INR", receipt: orderNumber }) });
@@ -339,6 +343,20 @@ async function dispatch(request: NextRequest, segments: string[]) {
       prisma.order.count({ where: { userId: user.id } }),
     ]);
     return ok(orders, { total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+  }
+
+  if (method === "GET" && segments[0] === "orders" && segments[1] && segments.length === 2) {
+    const order = await prisma.order.findFirst({
+      where: { id: segments[1], userId: user.id },
+      include: {
+        items: true,
+        address: true,
+        delivery: true,
+        statusHistory: { orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!order) throw new ApiError("Order not found", 404);
+    return ok(order);
   }
 
   if (method === "POST" && segments[0] === "orders" && segments[2] === "cancel") {
@@ -575,6 +593,10 @@ async function handle(request: NextRequest, context: Context) {
     return await dispatch(request, path);
   } catch (error) {
     if (error instanceof ApiError) return fail(error.message, error.status);
+    const prismaCode = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    if (["P2024", "P2028"].includes(prismaCode)) return fail("Order processing took too long. Please try again; your cart is unchanged.", 503);
+    if (prismaCode === "P2002") return fail("This information already exists. Please refresh and try again.", 409);
+    if (["P2003", "P2025"].includes(prismaCode)) return fail("Related order information is no longer available. Please refresh and try again.", 409);
     console.error("API request failed", error);
     return fail(process.env.NODE_ENV === "development" && error instanceof Error ? error.message : "Internal server error", 500);
   }
