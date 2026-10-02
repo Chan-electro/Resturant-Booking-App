@@ -197,9 +197,14 @@ async function dispatch(request: NextRequest, segments: string[]) {
 
   if (method === "PATCH" && route === "users/profile") {
     const input = await body(request);
+    const phone = input.phone === undefined ? undefined : String(input.phone).trim() || null;
+    if (phone) {
+      const owner = await prisma.user.findFirst({ where: { phone, id: { not: user.id } }, select: { id: true } });
+      if (owner) throw new ApiError("This phone number is already linked to another account", 409);
+    }
     return ok(await prisma.user.update({ where: { id: user.id }, data: {
       ...(input.name ? { name: String(input.name).trim() } : {}),
-      ...(input.phone !== undefined ? { phone: input.phone ? String(input.phone).trim() : null } : {}),
+      ...(phone !== undefined ? { phone } : {}),
     } }));
   }
 
@@ -218,6 +223,8 @@ async function dispatch(request: NextRequest, segments: string[]) {
         label: String(input.label || "Home"),
         street: String(input.street), city: String(input.city), state: String(input.state || "Karnataka"), zip: String(input.zip),
         instructions: input.instructions ? String(input.instructions) : null, isDefault: makeDefault,
+        lat: input.lat === undefined ? null : Math.max(-90, Math.min(90, number(input.lat))),
+        lng: input.lng === undefined ? null : Math.max(-180, Math.min(180, number(input.lng))),
       } });
     });
     return ok(address);
