@@ -29,6 +29,19 @@ function number(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function enabled(value: unknown) {
+  return ["true", "1", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+async function isMockPaymentEnabled() {
+  if (enabled(process.env.RAZORPAY_MOCK_MODE)) return true;
+  const setting = await prisma.setting.findUnique({
+    where: { key: "mock_payment_enabled" },
+    select: { value: true },
+  });
+  return enabled(setting?.value);
+}
+
 function indiaDateKey(value: Date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -167,14 +180,17 @@ async function dispatch(request: NextRequest, segments: string[]) {
 
   if (method === "GET" && route === "ordering-config") {
     const settings = await prisma.setting.findMany({
-      where: { key: { in: ["tax_rate", "delivery_fee", "free_delivery_minimum", "cutoff_time"] } },
+      where: { key: { in: ["tax_rate", "delivery_fee", "free_delivery_minimum", "cutoff_time", "mock_payment_enabled"] } },
     });
     const setting = (key: string, fallback: string) => settings.find((entry) => entry.key === key)?.value || fallback;
+    const mockPaymentEnabled = enabled(process.env.RAZORPAY_MOCK_MODE) || enabled(setting("mock_payment_enabled", "false"));
+    const razorpayConfigured = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
     return ok({
       taxRate: number(setting("tax_rate", "5"), 5),
       deliveryFee: number(setting("delivery_fee", "0"), 0),
       freeDeliveryMinimum: number(setting("free_delivery_minimum", "200"), 200),
       cutoffTime: setting("cutoff_time", "21:00"),
+      paymentMode: mockPaymentEnabled ? "mock" : razorpayConfigured ? "razorpay" : "unavailable",
     });
   }
 
@@ -259,7 +275,8 @@ async function dispatch(request: NextRequest, segments: string[]) {
     const onlinePayment = input.paymentMethod === "ONLINE";
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    const mockPayment = process.env.RAZORPAY_MOCK_MODE === "true";
+    const settings = await prisma.setting.findMany({ where: { key: { in: ["tax_rate", "delivery_fee", "free_delivery_minimum", "cutoff_time", "mock_payment_enabled"] } } });
+    const mockPayment = enabled(process.env.RAZORPAY_MOCK_MODE) || enabled(settings.find((item) => item.key === "mock_payment_enabled")?.value);
     if (onlinePayment && !mockPayment && (!keyId || !keySecret)) throw new ApiError("Online payments are not configured. Please choose cash on delivery.", 503);
     const deliveryDate = dateOnly(String(input.deliveryDate));
     if (deliveryDate <= dateOnly(new Date())) throw new ApiError("Delivery date must be in the future");
@@ -274,7 +291,6 @@ async function dispatch(request: NextRequest, segments: string[]) {
       return { menuItemId: menuItem.id, name: menuItem.name, price: menuItem.price, quantity, imageUrl: menuItem.imageUrl };
     });
     const subtotal = rows.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const settings = await prisma.setting.findMany({ where: { key: { in: ["tax_rate", "delivery_fee", "free_delivery_minimum", "cutoff_time"] } } });
     const setting = (key: string, fallback: number) => number(settings.find((item) => item.key === key)?.value, fallback);
     const cutoff = settings.find((item) => item.key === "cutoff_time")?.value || "21:00";
     const indiaTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
@@ -434,7 +450,7 @@ async function dispatch(request: NextRequest, segments: string[]) {
   }
 
   if (method === "POST" && segments[0] === "orders" && segments[2] === "confirm-test-payment") {
-    if (process.env.RAZORPAY_MOCK_MODE !== "true") throw new ApiError("Test payment mode is disabled", 404);
+    if (!await isMockPaymentEnabled()) throw new ApiError("Test payment mode is disabled", 404);
     const order = await prisma.order.findFirst({ where: { id: segments[1], userId: user.id, paymentMethod: "ONLINE" } });
     if (!order) throw new ApiError("Order not found", 404);
     if (order.status === "CANCELLED") throw new ApiError("A cancelled order cannot be paid", 409);
