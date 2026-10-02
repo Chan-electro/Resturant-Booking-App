@@ -241,7 +241,7 @@ async function dispatch(request: NextRequest, segments: string[]) {
         userId: user.id,
         ...values,
       } });
-    });
+    }, { maxWait: 10000, timeout: 15000 });
     return ok(address);
   }
 
@@ -259,7 +259,8 @@ async function dispatch(request: NextRequest, segments: string[]) {
     const onlinePayment = input.paymentMethod === "ONLINE";
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (onlinePayment && (!keyId || !keySecret)) throw new ApiError("Online payments are not configured. Please choose cash on delivery.", 503);
+    const mockPayment = process.env.RAZORPAY_MOCK_MODE === "true";
+    if (onlinePayment && !mockPayment && (!keyId || !keySecret)) throw new ApiError("Online payments are not configured. Please choose cash on delivery.", 503);
     const deliveryDate = dateOnly(String(input.deliveryDate));
     if (deliveryDate <= dateOnly(new Date())) throw new ApiError("Delivery date must be in the future");
     const address = await prisma.address.findFirst({ where: { id: String(input.addressId), userId: user.id } });
@@ -302,8 +303,12 @@ async function dispatch(request: NextRequest, segments: string[]) {
         });
         if (claimed.count !== 1) throw new ApiError("This coupon has reached its usage limit", 409);
       }
+      const availabilityRows = await tx.dailyMenu.findMany({ where: {
+        date: deliveryDate,
+        menuItemId: { in: rows.map((item) => item.menuItemId) },
+      } });
       for (const item of rows) {
-        const availability = await tx.dailyMenu.findUnique({ where: { date_menuItemId: { date: deliveryDate, menuItemId: item.menuItemId } } });
+        const availability = availabilityRows.find((entry) => entry.menuItemId === item.menuItemId);
         if (!availability?.isAvailable || availability.remainingQty < item.quantity) throw new ApiError(`${item.name} is unavailable for the selected date`);
       }
       const created = await tx.order.create({ data: {
@@ -321,8 +326,9 @@ async function dispatch(request: NextRequest, segments: string[]) {
       }
       await tx.notification.create({ data: { userId: user.id, title: "Order placed", body: `Order #${orderNumber} has been received.`, type: "ORDER_CONFIRMATION", data: { orderId: created.id } } });
       return created;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
     if (!onlinePayment) return ok(order);
+    if (mockPayment) return ok({ order, razorpay: { mock: true } });
     const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}` }, body: JSON.stringify({ amount: Math.round(total * 100), currency: "INR", receipt: orderNumber }) });
     if (!razorpayResponse.ok) throw new ApiError("Unable to initialize online payment", 502);
     const razorpay = await razorpayResponse.json() as { id: string; amount: number; currency: string };
@@ -337,6 +343,20 @@ async function dispatch(request: NextRequest, segments: string[]) {
       prisma.order.count({ where: { userId: user.id } }),
     ]);
     return ok(orders, { total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+  }
+
+  if (method === "GET" && segments[0] === "orders" && segments[1] && segments.length === 2) {
+    const order = await prisma.order.findFirst({
+      where: { id: segments[1], userId: user.id },
+      include: {
+        items: true,
+        address: true,
+        delivery: true,
+        statusHistory: { orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!order) throw new ApiError("Order not found", 404);
+    return ok(order);
   }
 
   if (method === "POST" && segments[0] === "orders" && segments[2] === "cancel") {
@@ -411,6 +431,20 @@ async function dispatch(request: NextRequest, segments: string[]) {
     const supplied = Buffer.from(String(input.razorpaySignature || ""), "hex");
     if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) throw new ApiError("Invalid payment signature", 400);
     return ok(await prisma.order.update({ where: { id: order.id }, data: { paymentStatus: "PAID" }, include: { items: true, address: true } }));
+  }
+
+  if (method === "POST" && segments[0] === "orders" && segments[2] === "confirm-test-payment") {
+    if (process.env.RAZORPAY_MOCK_MODE !== "true") throw new ApiError("Test payment mode is disabled", 404);
+    const order = await prisma.order.findFirst({ where: { id: segments[1], userId: user.id, paymentMethod: "ONLINE" } });
+    if (!order) throw new ApiError("Order not found", 404);
+    if (order.status === "CANCELLED") throw new ApiError("A cancelled order cannot be paid", 409);
+    const updated = await prisma.$transaction(async (tx) => {
+      const paid = await tx.order.update({ where: { id: order.id }, data: { paymentStatus: "PAID", status: "CONFIRMED" }, include: { items: true, address: true } });
+      await tx.orderStatusHistory.create({ data: { orderId: order.id, status: "CONFIRMED", changedBy: user.id, note: "Payment confirmed in explicit test mode" } });
+      await tx.notification.create({ data: { userId: user.id, title: "Test payment confirmed", body: `Test payment for order #${order.orderNumber} was successful.`, type: "SYSTEM", data: { orderId: order.id, testMode: true } } });
+      return paid;
+    });
+    return ok(updated);
   }
 
   if (method === "GET" && route === "delivery/available") {
@@ -559,6 +593,10 @@ async function handle(request: NextRequest, context: Context) {
     return await dispatch(request, path);
   } catch (error) {
     if (error instanceof ApiError) return fail(error.message, error.status);
+    const prismaCode = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    if (["P2024", "P2028"].includes(prismaCode)) return fail("Order processing took too long. Please try again; your cart is unchanged.", 503);
+    if (prismaCode === "P2002") return fail("This information already exists. Please refresh and try again.", 409);
+    if (["P2003", "P2025"].includes(prismaCode)) return fail("Related order information is no longer available. Please refresh and try again.", 409);
     console.error("API request failed", error);
     return fail(process.env.NODE_ENV === "development" && error instanceof Error ? error.message : "Internal server error", 500);
   }

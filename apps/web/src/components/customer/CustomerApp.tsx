@@ -221,6 +221,23 @@ export default function CustomerApp() {
   };
 
   const handleRazorpayPayment = async (orderId: string, razorpayData: any) => {
+    if (razorpayData.mock === true) {
+      const confirmed = confirm("Test payment mode is active. Simulate a successful online payment?");
+      if (!confirmed) {
+        setView("orders");
+        return;
+      }
+      const response = await ordersApi.confirmTestPayment(orderId);
+      if (response.success) {
+        setLastPlacedOrder((order) => order ? { ...order, paymentStatus: "paid", status: "confirmed" } : order);
+        setView("success");
+      } else {
+        alert(response.error || "Unable to confirm the test payment");
+        setView("orders");
+      }
+      return;
+    }
+
     const loaded = await loadRazorpayScript();
     if (!loaded) {
       alert("Failed to load Razorpay SDK. Please check your internet connection.");
@@ -367,13 +384,13 @@ export default function CustomerApp() {
             </h2>
             <p className="text-maroon/70 mb-8 px-4 leading-relaxed text-sm md:text-base">
               Your wholesome vegetarian meal is booked for{" "}
-              <strong>{getDeliveryDateLabel()}</strong>. The kitchen has received
+              <strong>{lastPlacedOrder ? formatDate(lastPlacedOrder.deliveryDate) : getDeliveryDateLabel()}</strong>. The kitchen has received
               your order.
             </p>
 
-            <div className="bg-cream/45 p-6 rounded-2xl w-full border border-ivory/60 text-left relative overflow-hidden mb-6">
+            <div className="bg-cream/45 p-5 md:p-6 rounded-2xl w-full border border-ivory/60 text-left relative overflow-hidden mb-6">
               <div className="absolute top-0 right-0 bg-ivory/20 w-32 h-32 rounded-full blur-3xl" />
-              <div className="relative z-10 space-y-4 text-sm md:text-base">
+              <div className="relative z-10 space-y-4 text-sm">
                 <div className="flex justify-between border-b border-ivory/60 pb-4">
                   <span className="text-maroon/60 font-medium">Order Number</span>
                   <span className="font-bold text-maroon font-mono text-sm">
@@ -383,10 +400,40 @@ export default function CustomerApp() {
                 <div className="flex justify-between border-b border-ivory/60 pb-4">
                   <span className="text-maroon/60 font-medium">Delivery</span>
                   <span className="font-bold text-maroon">
-                    {getDeliveryDateLabel()}
+                    {lastPlacedOrder ? formatDate(lastPlacedOrder.deliveryDate) : getDeliveryDateLabel()}
                   </span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between border-b border-ivory/60 pb-4">
+                  <span className="text-maroon/60 font-medium">Payment</span>
+                  <span className="font-bold capitalize text-maroon">
+                    {lastPlacedOrder?.paymentMethod === "online" ? "Online" : "Cash on delivery"} · {lastPlacedOrder?.paymentStatus || "pending"}
+                  </span>
+                </div>
+                {lastPlacedOrder?.address && (
+                  <div className="border-b border-ivory/60 pb-4">
+                    <p className="mb-1 text-maroon/60 font-medium">Delivering to</p>
+                    <p className="font-bold leading-5 text-maroon">{lastPlacedOrder.address.street}</p>
+                    <p className="text-maroon/70">{lastPlacedOrder.address.city}, {lastPlacedOrder.address.state} {lastPlacedOrder.address.zip}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="mb-2 text-maroon/60 font-medium">Order summary</p>
+                  <div className="space-y-2">
+                    {lastPlacedOrder?.items.map((item) => (
+                      <div key={item.id} className="flex justify-between gap-4">
+                        <span className="text-maroon/75">{item.quantity} × {item.name}</span>
+                        <span className="font-bold text-maroon">{formatPrice(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2 border-t border-ivory/60 pt-4">
+                  <div className="flex justify-between text-maroon/60"><span>Subtotal</span><span>{formatPrice(lastPlacedOrder?.subtotal || 0)}</span></div>
+                  {(lastPlacedOrder?.discount || 0) > 0 && <div className="flex justify-between font-medium text-green-700"><span>Discount</span><span>-{formatPrice(lastPlacedOrder?.discount || 0)}</span></div>}
+                  <div className="flex justify-between text-maroon/60"><span>Tax</span><span>{formatPrice(lastPlacedOrder?.tax || 0)}</span></div>
+                  <div className="flex justify-between text-maroon/60"><span>Delivery fee</span><span>{lastPlacedOrder?.deliveryFee ? formatPrice(lastPlacedOrder.deliveryFee) : "Free"}</span></div>
+                </div>
+                <div className="flex justify-between border-t border-ivory/60 pt-4">
                   <span className="text-maroon/60 font-medium">Total</span>
                   <span className="font-bold text-maroon text-lg">
                     {formatPrice(lastPlacedOrder?.total || 0)}
@@ -486,11 +533,17 @@ export default function CustomerApp() {
                         </span>
                       </div>
                     ))}
+                    {order.address && (
+                      <div className="mt-3 border-t border-ivory/60 pt-3 text-xs leading-5 text-maroon/55">
+                        <span className="font-bold text-maroon/70">Delivering to: </span>
+                        {order.address.street}, {order.address.city} {order.address.zip}
+                      </div>
+                    )}
                   </div>
                   <div className="px-4 py-3 bg-cream/10 border-t border-ivory/50 flex justify-between items-center text-xs text-maroon/50">
                     <span>Delivery: {formatDate(order.deliveryDate)}</span>
                     <div className="flex items-center gap-3">
-                      <span>Method: {order.paymentMethod.toUpperCase()}</span>
+                      <span>{order.paymentMethod.toUpperCase()} · {order.paymentStatus}</span>
                       {(["placed", "confirmed"] as OrderStatus[]).includes(order.status) && order.paymentStatus !== "paid" && (
                         <button onClick={() => handleCancelOrder(order.id)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 font-bold text-red-700 hover:bg-red-100">
                           Cancel

@@ -118,6 +118,9 @@ export const ordersApi = {
       body: JSON.stringify(data),
     }),
 
+  confirmTestPayment: (orderId: string) =>
+    request(`/orders/${orderId}/confirm-test-payment`, { method: "POST" }),
+
   kitchenQueue: () => request("/kitchen/orders"),
 
   productionSummary: () => request("/kitchen/production"),
