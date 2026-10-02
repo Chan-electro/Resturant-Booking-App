@@ -40,11 +40,14 @@ export const authApi = {
 
 export const menuApi = {
   categories: () => request("/menu/categories"),
-  items: (params?: { categoryId?: string; date?: string }) => {
+  items: (params?: { categoryId?: string; date?: string; all?: string }) => {
     const qs = new URLSearchParams(params as Record<string, string>).toString();
     return request(`/menu/items${qs ? `?${qs}` : ""}`);
   },
-  daily: (date?: string) => request(`/menu/daily${date ? `?date=${date}` : ""}`),
+  daily: (date?: string, all = false) => {
+    const qs = new URLSearchParams({ ...(date ? { date } : {}), ...(all ? { all: "true" } : {}) });
+    return request(`/menu/daily${qs.size ? `?${qs}` : ""}`);
+  },
   item: (id: string) => request(`/menu/items/${id}`),
   createItem: (data: object) =>
     request("/menu/items", { method: "POST", body: JSON.stringify(data) }),
@@ -74,6 +77,9 @@ export const cartApi = {
 // ===================== ORDERS =====================
 
 export const ordersApi = {
+  orderingConfig: () => request("/ordering-config"),
+  validateCoupon: (code: string, subtotal: number) =>
+    request("/coupons/validate", { method: "POST", body: JSON.stringify({ code, subtotal }) }),
   place: (data: {
     addressId: string;
     deliveryDate: string;

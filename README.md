@@ -38,6 +38,20 @@ Clerk verifies the browser session. The Vercel Route Handlers synchronize the
 Clerk identity with the application user and enforce database-backed roles.
 Existing accounts are linked by verified email on first Clerk sign-in.
 
+## Test online payments
+
+Switch the Razorpay dashboard to **Test mode**, generate an API key pair, and
+place it only in `apps/web/.env.local`:
+
+```env
+RAZORPAY_KEY_ID="rzp_test_your_key_id"
+RAZORPAY_KEY_SECRET="your_test_key_secret"
+```
+
+Restart the web app after changing the environment file. The checkout then
+offers **Pay online** and creates Razorpay orders in test mode. Do not commit
+the real test secret; `.env.local` is ignored by Git.
+
 ## Deployment
 
 Production uses Vercel for the Next.js application, Supabase for PostgreSQL and Realtime, and Clerk for authentication. The NestJS workspace is retained only as migration/legacy reference and does not need a production host. Follow [the deployment guide](docs/SETUP_VERCEL_SUPABASE_CLERK.md).

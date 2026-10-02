@@ -18,23 +18,25 @@ import {
   MapPin,
 } from "lucide-react";
 import { useCart } from "@/lib/store";
-import type { MenuItem, Category, Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
-import { cn, formatPrice, getDeliveryDateLabel, getCountdownToTime } from "@/lib/utils";
+import type { MenuItem, Category, Order, OrderStatus, PaymentMethod, PaymentStatus, Address } from "@/lib/types";
+import { cn, formatDate, formatPrice, getDeliveryDateLabel, getCountdownToTime, getTomorrowDateKey } from "@/lib/utils";
 import { menuApi, ordersApi, usersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
 
 type View = "menu" | "cart" | "checkout" | "success" | "orders";
 
 export default function CustomerApp() {
-  const cart = useCart();
+  const [pricing, setPricing] = useState({ taxRate: 5, deliveryFee: 0, freeDeliveryMinimum: 200, cutoffTime: "21:00" });
+  const cart = useCart(pricing);
   const [view, setView] = useState<View>("menu");
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [countdown, setCountdown] = useState(getCountdownToTime());
+  const [countdown, setCountdown] = useState(getCountdownToTime("21:00"));
   const [loading, setLoading] = useState(true);
+  const [menuError, setMenuError] = useState("");
   const [lastPlacedOrder, setLastPlacedOrder] = useState<Order | null>(null);
 
   // User's order list
@@ -51,20 +53,26 @@ export default function CustomerApp() {
     zip: "",
     instructions: "",
   });
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
   const [payment, setPayment] = useState<"cod" | "online">("cod");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponError, setCouponError] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number; subtotal: number } | null>(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   // Load menu and categories on mount
   useEffect(() => {
     async function loadData() {
       try {
-        const [catRes, dailyRes] = await Promise.all([
+        const [catRes, dailyRes, configRes] = await Promise.all([
           menuApi.categories(),
           menuApi.daily(),
+          ordersApi.orderingConfig(),
         ]);
         if (catRes.success && catRes.data) {
           const cats = catRes.data as Category[];
           setCategories(cats);
-          if (cats.length > 0) setActiveCategory(cats[0].id);
         }
         if (dailyRes.success && dailyRes.data) {
           const rawItems = (dailyRes.data as any).tomorrow?.items || [];
@@ -88,8 +96,11 @@ export default function CustomerApp() {
           });
           setMenuItems(mapped);
         }
+        if (configRes.success && configRes.data) setPricing(configRes.data as typeof pricing);
+        if (!dailyRes.success) setMenuError(dailyRes.error || "Unable to load tomorrow's menu");
       } catch (err) {
         console.error("Failed to load customer menu:", err);
+        setMenuError("Unable to load tomorrow's menu. Please refresh and try again.");
       } finally {
         setLoading(false);
       }
@@ -114,8 +125,10 @@ export default function CustomerApp() {
 
         if (addrRes.success && addrRes.data) {
           const addresses = addrRes.data as any[];
+          setSavedAddresses(addresses as Address[]);
           const defaultAddress = addresses.find((a) => a.isDefault) || addresses[0];
           if (defaultAddress) {
+            setSelectedAddressId(defaultAddress.id);
             setAddress({
               street: defaultAddress.street || "",
               city: defaultAddress.city || "Bangalore",
@@ -157,12 +170,12 @@ export default function CustomerApp() {
 
   // Countdown timer
   useEffect(() => {
-    const timer = setInterval(() => setCountdown(getCountdownToTime()), 1000);
+    const timer = setInterval(() => setCountdown(getCountdownToTime(pricing.cutoffTime)), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [pricing.cutoffTime]);
 
   const filteredItems = menuItems.filter((item) => {
-    const matchesCategory = item.categoryId === activeCategory;
+    const matchesCategory = !activeCategory || item.categoryId === activeCategory;
     const matchesSearch =
       !searchQuery ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -175,6 +188,22 @@ export default function CustomerApp() {
 
   const handleAdd = (item: MenuItem) => {
     cart.addItem({ menuItem: item, quantity: 1 });
+  };
+
+  const validAppliedCoupon = appliedCoupon?.subtotal === cart.subtotal ? appliedCoupon : null;
+  const checkoutDiscount = validAppliedCoupon?.discount || 0;
+  const checkoutTax = Math.round(Math.max(0, cart.subtotal - checkoutDiscount) * (pricing.taxRate / 100) * 100) / 100;
+  const checkoutTotal = Math.max(0, cart.subtotal - checkoutDiscount) + checkoutTax + cart.deliveryFee;
+
+  const handleApplyCoupon = async () => {
+    setCouponError("");
+    const code = couponCode.trim().toUpperCase();
+    if (!code) return setCouponError("Enter a coupon code");
+    const response = await ordersApi.validateCoupon(code, cart.subtotal);
+    if (!response.success || !response.data) return setCouponError(response.error || "Coupon could not be applied");
+    const result = response.data as { code: string; discount: number };
+    setCouponCode(result.code);
+    setAppliedCoupon({ ...result, subtotal: cart.subtotal });
   };
 
   const loadRazorpayScript = () => {
@@ -243,24 +272,27 @@ export default function CustomerApp() {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (placingOrder || cart.totalItems === 0) return;
+    setPlacingOrder(true);
     try {
-      // 1. Add Address
-      const addrRes = await usersApi.addAddress({
-        label: "Delivery",
-        street: address.street,
-        city: address.city,
-        state: address.state,
-        zip: address.zip,
-        instructions: address.instructions || undefined,
-        isDefault: true,
-      });
-
-      if (!addrRes.success || !addrRes.data) {
-        alert("Failed to save delivery address: " + (addrRes.error || "Unknown error"));
-        return;
+      // 1. Reuse a saved address or create a new one when the customer edits it.
+      let addressId = selectedAddressId;
+      if (!addressId) {
+        const addrRes = await usersApi.addAddress({
+          label: "Delivery",
+          street: address.street,
+          city: address.city,
+          state: address.state,
+          zip: address.zip,
+          instructions: address.instructions || undefined,
+          isDefault: true,
+        });
+        if (!addrRes.success || !addrRes.data) {
+          alert("Failed to save delivery address: " + (addrRes.error || "Unknown error"));
+          return;
+        }
+        addressId = (addrRes.data as Address).id;
       }
-
-      const addressId = (addrRes.data as any).id;
 
       // 2. Map items
       const items = cart.items.map((item) => ({
@@ -269,16 +301,14 @@ export default function CustomerApp() {
       }));
 
       // Delivery Date is tomorrow
-      const deliveryDate = new Date();
-      deliveryDate.setDate(deliveryDate.getDate() + 1);
-
       // 3. Place Order
       const orderRes = await ordersApi.place({
         addressId,
-        deliveryDate: deliveryDate.toISOString().split("T")[0],
+        deliveryDate: getTomorrowDateKey(),
         items,
         paymentMethod: payment === "online" ? "ONLINE" : "COD",
         specialInstructions: address.instructions || undefined,
+        couponCode: validAppliedCoupon?.code,
       });
 
       if (orderRes.success && orderRes.data) {
@@ -304,7 +334,16 @@ export default function CustomerApp() {
     } catch (err) {
       console.error("Checkout failed:", err);
       alert("An unexpected error occurred during checkout.");
+    } finally {
+      setPlacingOrder(false);
     }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm("Cancel this order?")) return;
+    const response = await ordersApi.cancel(orderId);
+    if (!response.success) return alert(response.error || "Unable to cancel order");
+    setUserOrders((orders) => orders.map((order) => order.id === orderId ? { ...order, status: "cancelled" } : order));
   };
 
   // ==================== SUCCESS VIEW ====================
@@ -443,8 +482,15 @@ export default function CustomerApp() {
                     ))}
                   </div>
                   <div className="px-4 py-3 bg-cream/10 border-t border-ivory/50 flex justify-between items-center text-xs text-maroon/50">
-                    <span>Delivery: {getDeliveryDateLabel()}</span>
-                    <span>Method: {order.paymentMethod.toUpperCase()}</span>
+                    <span>Delivery: {formatDate(order.deliveryDate)}</span>
+                    <div className="flex items-center gap-3">
+                      <span>Method: {order.paymentMethod.toUpperCase()}</span>
+                      {(["placed", "confirmed"] as OrderStatus[]).includes(order.status) && order.paymentStatus !== "paid" && (
+                        <button onClick={() => handleCancelOrder(order.id)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 font-bold text-red-700 hover:bg-red-100">
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -533,9 +579,15 @@ export default function CustomerApp() {
                 <span>{formatPrice(cart.subtotal)}</span>
               </div>
               <div className="flex justify-between text-maroon/60 font-medium">
-                <span>Tax (5%)</span>
-                <span>{formatPrice(cart.tax)}</span>
+                <span>Tax ({pricing.taxRate}%)</span>
+                <span>{formatPrice(checkoutTax)}</span>
               </div>
+              {checkoutDiscount > 0 && (
+                <div className="flex justify-between font-bold text-green-700">
+                  <span>Coupon ({validAppliedCoupon?.code})</span>
+                  <span>-{formatPrice(checkoutDiscount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-maroon/60 font-medium">
                 <span>Delivery</span>
                 <span
@@ -551,7 +603,7 @@ export default function CustomerApp() {
               </div>
               <div className="flex justify-between font-bold text-xl text-maroon pt-3 border-t border-ivory mt-3">
                 <span>Total</span>
-                <span>{formatPrice(cart.total)}</span>
+                <span>{formatPrice(checkoutTotal)}</span>
               </div>
             </div>
           </section>
@@ -565,6 +617,25 @@ export default function CustomerApp() {
             <h2 className="text-xs font-bold text-maroon/60 uppercase tracking-widest mb-1">
               Delivery Details
             </h2>
+
+            {savedAddresses.length > 0 && (
+              <div>
+                <label className="block text-xs font-bold text-maroon mb-1.5">Saved address</label>
+                <select
+                  value={selectedAddressId}
+                  onChange={(event) => {
+                    const id = event.target.value;
+                    setSelectedAddressId(id);
+                    const selected = savedAddresses.find((entry) => entry.id === id);
+                    if (selected) setAddress({ street: selected.street, city: selected.city, state: selected.state, zip: selected.zip, instructions: selected.instructions || "" });
+                  }}
+                  className="w-full bg-cream border border-ivory rounded-xl px-4 py-3 text-maroon font-medium focus:outline-none focus:border-gold"
+                >
+                  <option value="">Use a new address</option>
+                  {savedAddresses.map((entry) => <option key={entry.id} value={entry.id}>{entry.label} — {entry.street}</option>)}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -602,9 +673,10 @@ export default function CustomerApp() {
               <input
                 required
                 value={address.street}
-                onChange={(e) =>
-                  setAddress({ ...address, street: e.target.value })
-                }
+                onChange={(e) => {
+                  setAddress({ ...address, street: e.target.value });
+                  setSelectedAddressId("");
+                }}
                 type="text"
                 className="w-full bg-cream border border-ivory rounded-xl px-4 py-3 text-maroon font-medium placeholder-maroon/30 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-shadow"
                 placeholder="House/Flat No., Street, Locality"
@@ -619,9 +691,10 @@ export default function CustomerApp() {
                 <input
                   required
                   value={address.zip}
-                  onChange={(e) =>
-                    setAddress({ ...address, zip: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setAddress({ ...address, zip: e.target.value });
+                    setSelectedAddressId("");
+                  }}
                   type="text"
                   className="w-full bg-cream border border-ivory rounded-xl px-4 py-3 text-maroon font-medium placeholder-maroon/30 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-shadow"
                   placeholder="560001"
@@ -634,9 +707,10 @@ export default function CustomerApp() {
                 </label>
                 <input
                   value={address.instructions}
-                  onChange={(e) =>
-                    setAddress({ ...address, instructions: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setAddress({ ...address, instructions: e.target.value });
+                    setSelectedAddressId("");
+                  }}
                   type="text"
                   className="w-full bg-cream border border-ivory rounded-xl px-4 py-3 text-maroon font-medium placeholder-maroon/30 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-shadow"
                   placeholder="e.g. Leave at door"
@@ -644,6 +718,32 @@ export default function CustomerApp() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-maroon mb-1.5">Coupon</label>
+              <div className="flex gap-2">
+                <input
+                  value={couponCode}
+                  onChange={(event) => { setCouponCode(event.target.value.toUpperCase()); setAppliedCoupon(null); setCouponError(""); }}
+                  className="min-w-0 flex-1 bg-cream border border-ivory rounded-xl px-4 py-3 text-maroon font-bold uppercase focus:outline-none focus:border-gold"
+                  placeholder="ENTER CODE"
+                />
+                <button type="button" onClick={handleApplyCoupon} className="rounded-xl bg-gold px-4 py-3 text-sm font-bold text-white hover:bg-gold-dark">Apply</button>
+              </div>
+              {couponError && <p className="mt-1.5 text-xs font-medium text-red-600">{couponError}</p>}
+              {validAppliedCoupon && <p className="mt-1.5 text-xs font-bold text-green-700">Coupon applied — you save {formatPrice(validAppliedCoupon.discount)}</p>}
+              {appliedCoupon && !validAppliedCoupon && <p className="mt-1.5 text-xs font-medium text-amber-700">Cart changed. Apply the coupon again.</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-maroon mb-2">Payment method</label>
+              <div className="grid grid-cols-2 gap-3">
+                {([["cod", "Cash on delivery"], ["online", "Pay online"]] as const).map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setPayment(value)} className={cn("rounded-xl border px-3 py-3 text-sm font-bold transition-colors", payment === value ? "border-maroon bg-maroon text-cream" : "border-ivory bg-cream text-maroon")}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
 
             {/* Desktop Place Order Button */}
@@ -651,12 +751,12 @@ export default function CustomerApp() {
               <button
                 form="checkout-form"
                 type="submit"
-                disabled={cart.totalItems === 0}
+                disabled={cart.totalItems === 0 || placingOrder || countdown.isExpired}
                 className="w-full py-4 bg-maroon text-cream font-bold text-lg rounded-xl shadow-sm hover:bg-burgundy transition-all flex justify-between items-center px-6 disabled:opacity-50 active:scale-[0.98]"
               >
-                <span>Place Order</span>
+                <span>{placingOrder ? "Placing order…" : countdown.isExpired ? "Ordering closed" : "Place Order"}</span>
                 <span className="bg-cream/20 px-3 py-1 rounded-lg">
-                  {formatPrice(cart.total)}
+                  {formatPrice(checkoutTotal)}
                 </span>
               </button>
             </div>
@@ -668,12 +768,12 @@ export default function CustomerApp() {
           <button
             form="checkout-form"
             type="submit"
-            disabled={cart.totalItems === 0}
+            disabled={cart.totalItems === 0 || placingOrder || countdown.isExpired}
             className="w-full py-4 bg-maroon text-cream font-bold text-lg rounded-xl shadow-sm hover:bg-burgundy transition-all flex justify-between items-center px-6 disabled:opacity-50 active:scale-[0.98]"
           >
-            <span>Place Order</span>
+            <span>{placingOrder ? "Placing order…" : countdown.isExpired ? "Ordering closed" : "Place Order"}</span>
             <span className="bg-cream/20 px-3 py-1 rounded-lg">
-              {formatPrice(cart.total)}
+              {formatPrice(checkoutTotal)}
             </span>
           </button>
         </div>
@@ -795,20 +895,31 @@ export default function CustomerApp() {
               ))}
             </div>
           ) : (
-            categories.map((cat) => (
+            <>
               <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => setActiveCategory("")}
                 className={cn(
                   "px-4 py-2.5 rounded-full text-sm font-bold shadow-sm whitespace-nowrap transition-all duration-200 border",
-                  activeCategory === cat.id
-                    ? "bg-maroon border-maroon text-cream scale-105 shadow-md"
-                    : "bg-white border-ivory text-maroon/70 hover:bg-cream hover:border-gold/30"
+                  activeCategory === "" ? "bg-maroon border-maroon text-cream scale-105 shadow-md" : "bg-white border-ivory text-maroon/70 hover:bg-cream hover:border-gold/30"
                 )}
               >
-                {cat.name}
+                All dishes
               </button>
-            ))
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={cn(
+                    "px-4 py-2.5 rounded-full text-sm font-bold shadow-sm whitespace-nowrap transition-all duration-200 border",
+                    activeCategory === cat.id
+                      ? "bg-maroon border-maroon text-cream scale-105 shadow-md"
+                      : "bg-white border-ivory text-maroon/70 hover:bg-cream hover:border-gold/30"
+                  )}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </>
           )}
         </div>
       </div>
@@ -820,8 +931,11 @@ export default function CustomerApp() {
           {filteredItems.length === 0 ? (
             <div className="py-12 text-center col-span-full">
               <p className="text-maroon/40 font-medium">
-                No dishes found in this category
+                {menuError || (searchQuery ? "No dishes match your search" : "No dishes are scheduled for tomorrow yet")}
               </p>
+              {activeCategory && !menuError && (
+                <button onClick={() => setActiveCategory("")} className="mt-3 text-sm font-bold text-gold hover:underline">View all dishes</button>
+              )}
             </div>
           ) : (
             filteredItems.map((item) => (
@@ -978,7 +1092,7 @@ export default function CustomerApp() {
                     <span>{formatPrice(cart.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-maroon/60 font-medium">
-                    <span>Tax (5%)</span>
+                    <span>Tax ({pricing.taxRate}%)</span>
                     <span>{formatPrice(cart.tax)}</span>
                   </div>
                   <div className="flex justify-between text-maroon/60 font-medium">

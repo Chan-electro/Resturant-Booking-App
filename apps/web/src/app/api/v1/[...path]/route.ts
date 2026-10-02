@@ -29,9 +29,23 @@ function number(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function indiaDateKey(value: Date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((entry) => entry.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 function dateOnly(value: string | Date) {
-  const date = new Date(value);
-  date.setUTCHours(0, 0, 0, 0);
+  const key = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : indiaDateKey(value instanceof Date ? value : new Date(value));
+  const date = new Date(`${key}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) throw new ApiError("Invalid date");
   return date;
 }
 
@@ -61,8 +75,10 @@ async function dispatch(request: NextRequest, segments: string[]) {
 
   if (method === "GET" && route === "menu/items") {
     const categoryId = url.searchParams.get("categoryId") || undefined;
+    const showAll = url.searchParams.get("all") === "true";
+    if (showAll) requireRole(user, "ADMIN");
     const items = await prisma.menuItem.findMany({
-      where: { isActive: true, ...(categoryId ? { categoryId } : {}) },
+      where: { ...(showAll ? {} : { isActive: true, category: { isActive: true } }), ...(categoryId ? { categoryId } : {}) },
       include: { category: true, tags: { include: { tag: true } } },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
@@ -82,10 +98,17 @@ async function dispatch(request: NextRequest, segments: string[]) {
     const today = dateOnly(url.searchParams.get("date") || new Date());
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const showAll = url.searchParams.get("all") === "true";
+    if (showAll) requireRole(user, "ADMIN");
+    const availabilityWhere = showAll ? {} : {
+      isAvailable: true,
+      remainingQty: { gt: 0 },
+      menuItem: { isActive: true, category: { isActive: true } },
+    };
     const include = { menuItem: { include: { category: true, tags: { include: { tag: true } } } } };
     const [todayItems, tomorrowItems] = await Promise.all([
-      prisma.dailyMenu.findMany({ where: { date: today, isAvailable: true }, include, orderBy: { menuItem: { sortOrder: "asc" } } }),
-      prisma.dailyMenu.findMany({ where: { date: tomorrow, isAvailable: true }, include, orderBy: { menuItem: { sortOrder: "asc" } } }),
+      prisma.dailyMenu.findMany({ where: { date: today, ...availabilityWhere }, include, orderBy: { menuItem: { sortOrder: "asc" } } }),
+      prisma.dailyMenu.findMany({ where: { date: tomorrow, ...availabilityWhere }, include, orderBy: { menuItem: { sortOrder: "asc" } } }),
     ]);
     return ok({
       today: { date: today.toISOString().slice(0, 10), items: todayItems },
@@ -140,6 +163,34 @@ async function dispatch(request: NextRequest, segments: string[]) {
       ...(input.availableQty !== undefined ? { availableQty: number(input.availableQty) } : {}),
       ...(input.remainingQty !== undefined ? { remainingQty: number(input.remainingQty) } : {}),
     } }));
+  }
+
+  if (method === "GET" && route === "ordering-config") {
+    const settings = await prisma.setting.findMany({
+      where: { key: { in: ["tax_rate", "delivery_fee", "free_delivery_minimum", "cutoff_time"] } },
+    });
+    const setting = (key: string, fallback: string) => settings.find((entry) => entry.key === key)?.value || fallback;
+    return ok({
+      taxRate: number(setting("tax_rate", "5"), 5),
+      deliveryFee: number(setting("delivery_fee", "0"), 0),
+      freeDeliveryMinimum: number(setting("free_delivery_minimum", "200"), 200),
+      cutoffTime: setting("cutoff_time", "21:00"),
+    });
+  }
+
+  if (method === "POST" && route === "coupons/validate") {
+    const input = await body(request);
+    const code = String(input.code || "").trim().toUpperCase();
+    const subtotal = Math.max(0, number(input.subtotal));
+    const coupon = await prisma.coupon.findUnique({ where: { code } });
+    const now = new Date();
+    if (!coupon || !coupon.isActive || coupon.validFrom > now || coupon.validUntil < now || coupon.usedCount >= coupon.usageLimit) {
+      throw new ApiError("This coupon is invalid or has expired", 404);
+    }
+    if (subtotal < coupon.minOrder) throw new ApiError(`Minimum order value is ₹${coupon.minOrder}`);
+    const rawDiscount = coupon.type === "PERCENTAGE" ? subtotal * coupon.value / 100 : coupon.value;
+    const discount = Math.min(subtotal, coupon.maxDiscount ? Math.min(rawDiscount, coupon.maxDiscount) : rawDiscount);
+    return ok({ code: coupon.code, discount: Math.round(discount * 100) / 100 });
   }
 
   if (method === "GET" && route === "users/profile") return ok(await prisma.user.findUnique({ where: { id: user.id } }));
@@ -205,17 +256,36 @@ async function dispatch(request: NextRequest, segments: string[]) {
     const cutoff = settings.find((item) => item.key === "cutoff_time")?.value || "21:00";
     const indiaTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
     if (indiaTime >= cutoff) throw new ApiError(`Orders close at ${cutoff} IST for next-day delivery`);
-    const tax = Math.round(subtotal * (setting("tax_rate", 5) / 100) * 100) / 100;
+    let coupon: Awaited<ReturnType<typeof prisma.coupon.findUnique>> = null;
+    let discount = 0;
+    const couponCode = input.couponCode ? String(input.couponCode).trim().toUpperCase() : null;
+    if (couponCode) {
+      coupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
+      const now = new Date();
+      if (!coupon || !coupon.isActive || coupon.validFrom > now || coupon.validUntil < now || coupon.usedCount >= coupon.usageLimit) throw new ApiError("This coupon is invalid or has expired");
+      if (subtotal < coupon.minOrder) throw new ApiError(`Minimum order value is ₹${coupon.minOrder}`);
+      const rawDiscount = coupon.type === "PERCENTAGE" ? subtotal * coupon.value / 100 : coupon.value;
+      discount = Math.round(Math.min(subtotal, coupon.maxDiscount ? Math.min(rawDiscount, coupon.maxDiscount) : rawDiscount) * 100) / 100;
+    }
+    const taxableSubtotal = Math.max(0, subtotal - discount);
+    const tax = Math.round(taxableSubtotal * (setting("tax_rate", 5) / 100) * 100) / 100;
     const deliveryFee = subtotal >= setting("free_delivery_minimum", 200) ? 0 : setting("delivery_fee", 0);
-    const total = subtotal + tax + deliveryFee;
+    const total = taxableSubtotal + tax + deliveryFee;
     const orderNumber = `MS${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`;
     const order = await prisma.$transaction(async (tx) => {
+      if (coupon) {
+        const claimed = await tx.coupon.updateMany({
+          where: { id: coupon.id, isActive: true, usedCount: { lt: coupon.usageLimit } },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (claimed.count !== 1) throw new ApiError("This coupon has reached its usage limit", 409);
+      }
       for (const item of rows) {
         const availability = await tx.dailyMenu.findUnique({ where: { date_menuItemId: { date: deliveryDate, menuItemId: item.menuItemId } } });
         if (!availability?.isAvailable || availability.remainingQty < item.quantity) throw new ApiError(`${item.name} is unavailable for the selected date`);
       }
       const created = await tx.order.create({ data: {
-        userId: user.id, addressId: address.id, orderNumber, subtotal, tax, deliveryFee, total,
+        userId: user.id, addressId: address.id, orderNumber, subtotal, tax, deliveryFee, discount, total, couponCode,
         paymentMethod: onlinePayment ? "ONLINE" : "COD", deliveryDate,
         specialInstructions: input.specialInstructions ? String(input.specialInstructions) : null,
         items: { create: rows }, statusHistory: { create: { status: "PLACED", changedBy: user.id, note: "Order placed by customer" } },
@@ -245,6 +315,35 @@ async function dispatch(request: NextRequest, segments: string[]) {
       prisma.order.count({ where: { userId: user.id } }),
     ]);
     return ok(orders, { total, page, pageSize, totalPages: Math.ceil(total / pageSize) });
+  }
+
+  if (method === "POST" && segments[0] === "orders" && segments[2] === "cancel") {
+    const order = await prisma.order.findFirst({
+      where: { id: segments[1], userId: user.id },
+      include: { items: true },
+    });
+    if (!order) throw new ApiError("Order not found", 404);
+    if (!["PLACED", "CONFIRMED"].includes(order.status)) throw new ApiError("This order can no longer be cancelled", 409);
+    if (order.paymentStatus === "PAID") throw new ApiError("Please contact support to cancel a paid order", 409);
+    const cancelled = await prisma.$transaction(async (tx) => {
+      const transition = await tx.order.updateMany({
+        where: { id: order.id, userId: user.id, status: { in: ["PLACED", "CONFIRMED"] }, paymentStatus: { not: "PAID" } },
+        data: { status: "CANCELLED" },
+      });
+      if (transition.count !== 1) throw new ApiError("This order can no longer be cancelled", 409);
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
+      for (const item of order.items) {
+        await tx.dailyMenu.updateMany({
+          where: { date: order.deliveryDate, menuItemId: item.menuItemId },
+          data: { remainingQty: { increment: item.quantity } },
+        });
+      }
+      if (order.couponCode) await tx.coupon.updateMany({ where: { code: order.couponCode, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+      await tx.orderStatusHistory.create({ data: { orderId: order.id, status: "CANCELLED", changedBy: user.id, note: "Cancelled by customer" } });
+      await tx.notification.create({ data: { userId: user.id, title: "Order cancelled", body: `Order #${order.orderNumber} has been cancelled.`, type: "ORDER_STATUS", data: { orderId: order.id, status: "CANCELLED" } } });
+      return updated;
+    });
+    return ok(cancelled);
   }
 
   if (method === "GET" && route === "orders/admin") {

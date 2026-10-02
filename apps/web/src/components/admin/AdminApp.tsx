@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import type { Category, MenuItem, Order, OrderStatus, PaymentMethod, PaymentStatus, DashboardStats } from "@/lib/types";
 import { cn, formatPrice, getStatusColor, formatDate, formatTime } from "@/lib/utils";
+import { getTomorrowDateKey } from "@/lib/utils";
 import { adminApi, analyticsApi, menuApi, ordersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import { useApp } from "@/lib/store";
@@ -287,11 +288,18 @@ export default function AdminApp() {
     }
   };
 
+  const handleToggleItemActive = async (item: MenuItem) => {
+    const res = await menuApi.updateItem(item.id, { isActive: !item.isActive });
+    if (res.success) {
+      setMenuItems((items) => items.map((entry) => entry.id === item.id ? { ...entry, isActive: !entry.isActive } : entry));
+    } else {
+      alert(res.error || "Failed to update menu item status");
+    }
+  };
+
   const handleToggleTomorrowMenu = async (item: MenuItem) => {
     const existingEntry = tomorrowItems.find((t) => t.menuItemId === item.id);
-    const tomorrowDate = new Date();
-    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-    const tomorrowDateStr = tomorrowDate.toISOString().split("T")[0];
+    const tomorrowDateStr = getTomorrowDateKey();
 
     try {
       if (existingEntry) {
@@ -330,10 +338,10 @@ export default function AdminApp() {
       const [statsRes, catRes, menuRes, ordersRes, settingsRes, dailyRes] = await Promise.all([
         analyticsApi.dashboard(),
         menuApi.categories(),
-        menuApi.items(),
+        menuApi.items({ all: "true" }),
         ordersApi.adminList(1, 100),
         adminApi.settings(),
-        menuApi.daily(),
+        menuApi.daily(undefined, true),
       ]);
 
       if (statsRes.success && statsRes.data) {
@@ -573,7 +581,7 @@ export default function AdminApp() {
                     </div>
                   </div>
                   <h3 className="text-2xl lg:text-3xl font-bold text-maroon">
-                    9:00 PM
+                    {settings.cutoff_time || "21:00"} IST
                   </h3>
                   <p className="text-sm text-maroon/50 mt-2">Tonight&apos;s deadline</p>
                 </div>
@@ -769,16 +777,18 @@ export default function AdminApp() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <span
+                            <button
+                              onClick={() => handleToggleItemActive(item)}
                               className={cn(
                                 "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase",
                                 item.isActive
                                   ? "bg-green-50 text-green-800 border border-green-200"
                                   : "bg-red-50 text-red-800 border border-red-200"
                               )}
+                              title={item.isActive ? "Disable this item" : "Make this item active"}
                             >
                               {item.isActive ? "Active" : "Disabled"}
-                            </span>
+                            </button>
                           </td>
                           <td className="px-6 py-4">
                             {(() => {
