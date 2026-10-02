@@ -61,6 +61,7 @@ export default function AdminApp() {
     free_delivery_minimum: "200",
     delivery_fee: "0",
     service_zones: "Malleshwaram, Rajajinagar, Sadashivanagar",
+    mock_payment_enabled: "false",
   });
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState<AdminPage>("dashboard");
@@ -1308,6 +1309,32 @@ export default function AdminApp() {
                       <button
                         onClick={() => handleSaveSetting("service_zones", settings.service_zones)}
                         className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all shrink-0"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Test Payment Mode */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <div>
+                      <p className="font-bold text-maroon">Test Online Payments</p>
+                      <p className="text-sm text-maroon/60">
+                        Simulates successful payments without Razorpay keys. Never enable this for real orders.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={settings.mock_payment_enabled || "false"}
+                        onChange={(event) => setSettings({ ...settings, mock_payment_enabled: event.target.value })}
+                        className="bg-white border border-amber-200 rounded-xl px-4 py-2 text-sm text-maroon font-bold focus:outline-none focus:border-gold"
+                      >
+                        <option value="false">Disabled</option>
+                        <option value="true">Enabled</option>
+                      </select>
+                      <button
+                        onClick={() => handleSaveSetting("mock_payment_enabled", settings.mock_payment_enabled || "false")}
+                        className="bg-maroon text-cream text-xs font-bold px-3 py-2 rounded-lg hover:bg-burgundy transition-all"
                       >
                         Save
                       </button>

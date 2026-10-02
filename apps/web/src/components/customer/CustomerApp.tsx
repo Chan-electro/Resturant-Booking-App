@@ -24,9 +24,16 @@ import { menuApi, ordersApi, usersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
 
 type View = "menu" | "cart" | "checkout" | "success" | "orders";
+type OrderingConfig = {
+  taxRate: number;
+  deliveryFee: number;
+  freeDeliveryMinimum: number;
+  cutoffTime: string;
+  paymentMode: "mock" | "razorpay" | "unavailable";
+};
 
 export default function CustomerApp() {
-  const [pricing, setPricing] = useState({ taxRate: 5, deliveryFee: 0, freeDeliveryMinimum: 200, cutoffTime: "21:00" });
+  const [pricing, setPricing] = useState<OrderingConfig>({ taxRate: 5, deliveryFee: 0, freeDeliveryMinimum: 200, cutoffTime: "21:00", paymentMode: "unavailable" });
   const cart = useCart(pricing);
   const [view, setView] = useState<View>("menu");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -96,7 +103,7 @@ export default function CustomerApp() {
           });
           setMenuItems(mapped);
         }
-        if (configRes.success && configRes.data) setPricing(configRes.data as typeof pricing);
+        if (configRes.success && configRes.data) setPricing(configRes.data as OrderingConfig);
         if (!dailyRes.success) setMenuError(dailyRes.error || "Unable to load tomorrow's menu");
       } catch (err) {
         console.error("Failed to load customer menu:", err);
@@ -222,11 +229,6 @@ export default function CustomerApp() {
 
   const handleRazorpayPayment = async (orderId: string, razorpayData: any) => {
     if (razorpayData.mock === true) {
-      const confirmed = confirm("Test payment mode is active. Simulate a successful online payment?");
-      if (!confirmed) {
-        setView("orders");
-        return;
-      }
       const response = await ordersApi.confirmTestPayment(orderId);
       if (response.success) {
         setLastPlacedOrder((order) => order ? { ...order, paymentStatus: "paid", status: "confirmed" } : order);
@@ -796,12 +798,14 @@ export default function CustomerApp() {
             <div>
               <label className="block text-xs font-bold text-maroon mb-2">Payment method</label>
               <div className="grid grid-cols-2 gap-3">
-                {([["cod", "Cash on delivery"], ["online", "Pay online"]] as const).map(([value, label]) => (
-                  <button key={value} type="button" onClick={() => setPayment(value)} className={cn("rounded-xl border px-3 py-3 text-sm font-bold transition-colors", payment === value ? "border-maroon bg-maroon text-cream" : "border-ivory bg-cream text-maroon")}>
+                {([["cod", "Cash on delivery"], ["online", pricing.paymentMode === "mock" ? "Test online payment" : pricing.paymentMode === "razorpay" ? "Pay online" : "Online unavailable"]] as const).map(([value, label]) => (
+                  <button key={value} type="button" disabled={value === "online" && pricing.paymentMode === "unavailable"} onClick={() => setPayment(value)} className={cn("rounded-xl border px-3 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50", payment === value ? "border-maroon bg-maroon text-cream" : "border-ivory bg-cream text-maroon")}>
                     {label}
                   </button>
                 ))}
               </div>
+              {pricing.paymentMode === "mock" && <p className="mt-2 text-xs font-semibold text-amber-700">Test mode: no real money will be charged.</p>}
+              {pricing.paymentMode === "unavailable" && <p className="mt-2 text-xs text-maroon/50">Online payment has not been configured. Please use cash on delivery.</p>}
             </div>
 
 

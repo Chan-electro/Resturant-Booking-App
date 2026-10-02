@@ -61,6 +61,11 @@ RAZORPAY_KEY_SECRET=""
 RAZORPAY_MOCK_MODE="true"
 ```
 
+Alternatively, an administrator can open **Admin → Settings**, enable **Test
+Online Payments**, and save. The database setting is useful for deployed test
+environments where changing server environment variables would require a new
+deployment. The environment variable remains an override.
+
 Mock mode exercises order creation, payment confirmation, notifications, and
 the customer success screen without calling Razorpay. Never enable it for a
 real production deployment.
