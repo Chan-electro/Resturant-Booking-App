@@ -18,14 +18,45 @@ import { useClerk } from "@clerk/nextjs";
 
 function ClerkSignOutButton({ onSignedOut }: { onSignedOut: () => void }) {
   const { signOut } = useClerk();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+
   const handleSignOut = async () => {
-    await signOut({ redirectUrl: "/login" });
-    onSignedOut();
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    setSignOutError("");
+
+    try {
+      await signOut(() => {
+        onSignedOut();
+        window.location.replace("/login");
+      });
+    } catch (error) {
+      console.error("Clerk sign out failed", error);
+      setSignOutError("Unable to sign out. Please try again.");
+      setIsSigningOut(false);
+    }
   };
+
   return (
-    <button onClick={handleSignOut} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 transition-all text-left mt-0.5">
-      <LogOut className="w-4 h-4 text-red-400" /><span>Sign Out</span>
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        disabled={isSigningOut}
+        aria-busy={isSigningOut}
+        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl text-red-600 hover:bg-red-50 transition-all text-left mt-0.5 disabled:cursor-wait disabled:opacity-60"
+      >
+        <LogOut className="w-4 h-4 text-red-400" />
+        <span>{isSigningOut ? "Signing out..." : "Sign Out"}</span>
+      </button>
+      {signOutError && (
+        <p role="alert" className="px-3 pt-1 text-[11px] font-medium text-red-600">
+          {signOutError}
+        </p>
+      )}
+    </>
   );
 }
 
