@@ -69,24 +69,43 @@ export function getStatusLabel(status: string): string {
 }
 
 export function getDeliveryDateLabel(): string {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = new Date(`${getTomorrowDateKey()}T00:00:00+05:30`);
   return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
     weekday: "long",
     day: "numeric",
     month: "short",
   }).format(tomorrow);
 }
 
-export function getCountdownToTime(cutoffHour: number = 21): {
+export function getIndiaDateKey(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value || "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+export function getTomorrowDateKey(date: Date = new Date()): string {
+  const [year, month, day] = getIndiaDateKey(date).split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1));
+  return tomorrow.toISOString().slice(0, 10);
+}
+
+export function getCountdownToTime(cutoffTime: string = "21:00"): {
   hours: number;
   minutes: number;
   seconds: number;
   isExpired: boolean;
 } {
   const now = new Date();
-  const cutoff = new Date();
-  cutoff.setHours(cutoffHour, 0, 0, 0);
+  const [year, month, day] = getIndiaDateKey(now).split("-").map(Number);
+  const [cutoffHours, cutoffMinutes] = cutoffTime.split(":").map(Number);
+  const cutoff = new Date(Date.UTC(year, month - 1, day, cutoffHours - 5, cutoffMinutes - 30));
 
   if (now >= cutoff) {
     return { hours: 0, minutes: 0, seconds: 0, isExpired: true };

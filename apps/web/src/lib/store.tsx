@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from "react";
 import type { CartItem, Order, OrderStatus, UserRole } from "@/lib/types";
 
 // ===================== STATE =====================
@@ -19,6 +19,7 @@ interface AppState {
 type Action =
   | { type: "SET_ROLE"; payload: UserRole | null }
   | { type: "SET_USER"; payload: { name: string; email?: string } }
+  | { type: "LOAD_CART"; payload: CartItem[] }
   | { type: "ADD_TO_CART"; payload: CartItem }
   | { type: "REMOVE_FROM_CART"; payload: string }
   | { type: "UPDATE_CART_QTY"; payload: { menuItemId: string; quantity: number } }
@@ -51,6 +52,9 @@ function appReducer(state: AppState, action: Action): AppState {
         userEmail: action.payload.email,
         isAuthenticated: true,
       };
+
+    case "LOAD_CART":
+      return { ...state, cart: action.payload };
 
     case "ADD_TO_CART": {
       const existing = state.cart.find(
@@ -127,6 +131,25 @@ const AppContext = createContext<
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const [cartHydrated, setCartHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("ms-brahmin-cart");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) dispatch({ type: "LOAD_CART", payload: parsed });
+      }
+    } catch {
+      window.localStorage.removeItem("ms-brahmin-cart");
+    } finally {
+      setCartHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (cartHydrated) window.localStorage.setItem("ms-brahmin-cart", JSON.stringify(state.cart));
+  }, [cartHydrated, state.cart]);
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}
@@ -144,7 +167,7 @@ export function useApp() {
 
 // ===================== DERIVED STATE HOOKS =====================
 
-export function useCart() {
+export function useCart(pricing?: { taxRate: number; deliveryFee: number; freeDeliveryMinimum: number }) {
   const { state, dispatch } = useApp();
 
   const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -152,8 +175,11 @@ export function useCart() {
     (sum, item) => sum + item.menuItem.price * item.quantity,
     0
   );
-  const tax = Math.round(subtotal * 0.05 * 100) / 100;
-  const deliveryFee = subtotal >= 200 ? 0 : 30;
+  const taxRate = pricing?.taxRate ?? 5;
+  const configuredDeliveryFee = pricing?.deliveryFee ?? 0;
+  const freeDeliveryMinimum = pricing?.freeDeliveryMinimum ?? 200;
+  const tax = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+  const deliveryFee = subtotal >= freeDeliveryMinimum ? 0 : configuredDeliveryFee;
   const total = subtotal + tax + deliveryFee;
 
   return {
