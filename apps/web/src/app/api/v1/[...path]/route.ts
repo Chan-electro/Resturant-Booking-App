@@ -216,15 +216,30 @@ async function dispatch(request: NextRequest, segments: string[]) {
     const input = await body(request);
     if (!input.street || !input.city || !input.zip) throw new ApiError("Street, city and PIN code are required");
     const makeDefault = Boolean(input.isDefault);
+    const street = String(input.street).trim();
+    const city = String(input.city).trim();
+    const state = String(input.state || "Karnataka").trim();
+    const zip = String(input.zip).trim();
+    if (!/^\d{6}$/.test(zip)) throw new ApiError("A valid 6-digit PIN code is required");
     const address = await prisma.$transaction(async (tx) => {
       if (makeDefault) await tx.address.updateMany({ where: { userId: user.id }, data: { isDefault: false } });
-      return tx.address.create({ data: {
+      const existing = await tx.address.findFirst({ where: {
         userId: user.id,
-        label: String(input.label || "Home"),
-        street: String(input.street), city: String(input.city), state: String(input.state || "Karnataka"), zip: String(input.zip),
+        street: { equals: street, mode: "insensitive" },
+        city: { equals: city, mode: "insensitive" },
+        state: { equals: state, mode: "insensitive" },
+        zip,
+      } });
+      const values = {
+        label: String(input.label || "Home"), street, city, state, zip,
         instructions: input.instructions ? String(input.instructions) : null, isDefault: makeDefault,
         lat: input.lat === undefined ? null : Math.max(-90, Math.min(90, number(input.lat))),
         lng: input.lng === undefined ? null : Math.max(-180, Math.min(180, number(input.lng))),
+      };
+      if (existing) return tx.address.update({ where: { id: existing.id }, data: values });
+      return tx.address.create({ data: {
+        userId: user.id,
+        ...values,
       } });
     });
     return ok(address);

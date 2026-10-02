@@ -276,7 +276,13 @@ export default function CustomerApp() {
     setPlacingOrder(true);
     try {
       // 1. Reuse a saved address or create a new one when the customer edits it.
-      let addressId = selectedAddressId;
+      const matchingSavedAddress = savedAddresses.find((entry) =>
+        entry.street.trim().toLowerCase() === address.street.trim().toLowerCase()
+        && entry.city.trim().toLowerCase() === address.city.trim().toLowerCase()
+        && entry.state.trim().toLowerCase() === address.state.trim().toLowerCase()
+        && entry.zip.trim() === address.zip.trim()
+      );
+      let addressId = selectedAddressId || matchingSavedAddress?.id || "";
       if (!addressId) {
         const addrRes = await usersApi.addAddress({
           label: "Delivery",
