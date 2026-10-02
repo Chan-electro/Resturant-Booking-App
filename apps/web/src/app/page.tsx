@@ -7,6 +7,7 @@ import { authApi } from "@/lib/api";
 import { isClerkConfigured } from "@/lib/auth-mode";
 import { useApp } from "@/lib/store";
 import CustomerApp from "@/components/customer/CustomerApp";
+import CustomerOnboarding from "@/components/customer/CustomerOnboarding";
 import KitchenApp from "@/components/kitchen/KitchenApp";
 import DeliveryApp from "@/components/delivery/DeliveryApp";
 import AdminApp from "@/components/admin/AdminApp";
@@ -79,7 +80,7 @@ function AuthenticatedApp() {
     </main>
   );
 
-  return <>{state.currentRole === "customer" && <CustomerApp />}{state.currentRole === "kitchen" && <KitchenApp />}{state.currentRole === "delivery" && <DeliveryApp />}{state.currentRole === "admin" && <AdminApp />}</>;
+  return <>{state.currentRole === "customer" && <CustomerOnboarding><CustomerApp /></CustomerOnboarding>}{state.currentRole === "kitchen" && <KitchenApp />}{state.currentRole === "delivery" && <DeliveryApp />}{state.currentRole === "admin" && <AdminApp />}</>;
 }
 
 export default function Home() {
