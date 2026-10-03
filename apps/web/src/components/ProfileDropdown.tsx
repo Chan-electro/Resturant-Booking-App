@@ -28,10 +28,15 @@ function ClerkSignOutButton({ onSignedOut }: { onSignedOut: () => void }) {
     setSignOutError("");
 
     try {
-      await signOut(() => {
-        onSignedOut();
+      await signOut({ redirectUrl: "/login" });
+      onSignedOut();
+
+      // Clerk normally performs this navigation. Keep a hard-navigation
+      // fallback so cached client state cannot leave the signed-out user in a
+      // protected workspace if the redirect is interrupted by the browser.
+      if (window.location.pathname !== "/login") {
         window.location.replace("/login");
-      });
+      }
     } catch (error) {
       console.error("Clerk sign out failed", error);
       setSignOutError("Unable to sign out. Please try again.");
@@ -211,7 +216,12 @@ export default function ProfileDropdown({
                 <span>Settings</span>
               </button>
             )}
-            <ClerkSignOutButton onSignedOut={() => dispatch({ type: "SET_ROLE", payload: null })} />
+            <ClerkSignOutButton
+              onSignedOut={() => {
+                setIsOpen(false);
+                dispatch({ type: "RESET_SESSION" });
+              }}
+            />
           </div>
         </div>
       )}

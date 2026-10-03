@@ -19,6 +19,7 @@ interface AppState {
 type Action =
   | { type: "SET_ROLE"; payload: UserRole | null }
   | { type: "SET_USER"; payload: { name: string; email?: string } }
+  | { type: "RESET_SESSION" }
   | { type: "LOAD_CART"; payload: CartItem[] }
   | { type: "ADD_TO_CART"; payload: CartItem }
   | { type: "REMOVE_FROM_CART"; payload: string }
@@ -52,6 +53,9 @@ function appReducer(state: AppState, action: Action): AppState {
         userEmail: action.payload.email,
         isAuthenticated: true,
       };
+
+    case "RESET_SESSION":
+      return initialState;
 
     case "LOAD_CART":
       return { ...state, cart: action.payload };
