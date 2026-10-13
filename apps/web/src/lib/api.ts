@@ -89,6 +89,9 @@ export const ordersApi = {
     couponCode?: string;
   }) => request("/orders", { method: "POST", body: JSON.stringify(data) }),
 
+  importOrders: (orders: object[]) =>
+    request("/orders/import", { method: "POST", body: JSON.stringify({ orders }) }),
+
   list: (page = 1, pageSize = 10) =>
     request(`/orders?page=${page}&pageSize=${pageSize}`),
 
