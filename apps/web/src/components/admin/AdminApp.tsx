@@ -38,6 +38,7 @@ import { adminApi, analyticsApi, menuApi, ordersApi } from "@/lib/api";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import { useApp } from "@/lib/store";
 import { useOrderRealtime } from "@/lib/use-order-realtime";
+import OrderImportDialog from "@/components/admin/OrderImportDialog";
 
 type AdminPage = "dashboard" | "menu" | "orders" | "customers" | "analytics" | "settings";
 
@@ -67,6 +68,7 @@ export default function AdminApp() {
   const [activePage, setActivePage] = useState<AdminPage>("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [isOrderImportOpen, setIsOrderImportOpen] = useState(false);
   const { state: appState } = useApp();
 
   // User Management States
@@ -843,6 +845,9 @@ export default function AdminApp() {
                   {orders.length} total orders
                 </p>
                 <div className="flex gap-2">
+                  <button onClick={() => setIsOrderImportOpen(true)} className="bg-maroon text-cream font-bold px-4 py-2 rounded-xl shadow-sm hover:bg-burgundy flex items-center gap-2 text-sm">
+                    <Plus className="w-4 h-4" /> Add / Import Orders
+                  </button>
                   <button className="bg-white text-maroon font-bold px-4 py-2 rounded-xl border border-ivory shadow-sm hover:border-gold/30 flex items-center gap-2 text-sm">
                     <Filter className="w-4 h-4" /> Filter
                   </button>
@@ -1488,6 +1493,14 @@ export default function AdminApp() {
             </form>
           </div>
         </div>
+      )}
+
+      {isOrderImportOpen && (
+        <OrderImportDialog
+          menuItems={menuItems}
+          onClose={() => setIsOrderImportOpen(false)}
+          onImported={() => void fetchData()}
+        />
       )}
 
       {/* Create/Edit Menu Item Modal */}

@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { isClerkConfigured } from "@/lib/auth-mode";
+import SessionTimeout from "@/components/SessionTimeout";
 
 const bodyFont = localFont({
   src: [
@@ -70,7 +71,10 @@ export default function RootLayout({
       <body className="min-h-screen bg-cream text-maroon font-sans antialiased">
         {isClerkConfigured ? (
           <ClerkProvider>
-            <AppProvider>{children}</AppProvider>
+            <AppProvider>
+              <SessionTimeout />
+              {children}
+            </AppProvider>
           </ClerkProvider>
         ) : (
           <AppProvider>{children}</AppProvider>

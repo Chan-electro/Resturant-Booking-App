@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextRequest } from "next/server";
 import { ApiError, requireAppUser, requireRole } from "@/lib/server/session";
@@ -266,6 +266,137 @@ async function dispatch(request: NextRequest, segments: string[]) {
     if (!found) throw new ApiError("Address not found", 404);
     await prisma.address.delete({ where: { id: found.id } });
     return ok({ deleted: true });
+  }
+
+  if (method === "POST" && route === "orders/import") {
+    requireRole(user, "ADMIN");
+    const input = await body(request);
+    const importedOrders = Array.isArray(input.orders) ? input.orders as Json[] : [];
+    if (importedOrders.length === 0) throw new ApiError("Add at least one order");
+    if (importedOrders.length > 100) throw new ApiError("A batch can contain at most 100 orders");
+
+    const allowedPaymentMethods = new Set(["COD", "ONLINE"]);
+    const allowedPaymentStatuses = new Set(["PENDING", "PAID"]);
+    const allowedStatuses = new Set(["PLACED", "CONFIRMED"]);
+    const normalized = importedOrders.map((entry, index) => {
+      const row = index + 1;
+      const customerName = String(entry.customerName || "").trim();
+      const customerEmail = String(entry.customerEmail || "").trim().toLowerCase();
+      const customerPhone = String(entry.customerPhone || "").trim() || null;
+      const deliveryDateInput = String(entry.deliveryDate || "").trim();
+      const street = String(entry.street || "").trim();
+      const city = String(entry.city || "").trim();
+      const state = String(entry.state || "Karnataka").trim();
+      const zip = String(entry.zip || "").trim();
+      const paymentMethod = String(entry.paymentMethod || "COD").toUpperCase();
+      const paymentStatus = String(entry.paymentStatus || "PENDING").toUpperCase();
+      const status = String(entry.status || "PLACED").toUpperCase();
+      const items = Array.isArray(entry.items) ? entry.items as Json[] : [];
+
+      if (!customerName || customerName.length > 200) throw new ApiError(`Order ${row}: customer name is required and must be under 200 characters`);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) throw new ApiError(`Order ${row}: valid customer email is required`);
+      if (customerEmail.length > 320) throw new ApiError(`Order ${row}: customer email is too long`);
+      if (customerPhone && !/^\+?[0-9]{7,15}$/.test(customerPhone)) throw new ApiError(`Order ${row}: customer phone must contain 7 to 15 digits`);
+      if (!street || !city || !state || !/^\d{6}$/.test(zip)) throw new ApiError(`Order ${row}: complete address and 6-digit PIN are required`);
+      if (street.length > 500 || city.length > 100 || state.length > 100) throw new ApiError(`Order ${row}: address is too long`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDateInput)) throw new ApiError(`Order ${row}: delivery date must use YYYY-MM-DD`);
+      const deliveryDate = dateOnly(deliveryDateInput);
+      if (deliveryDate < dateOnly(new Date())) throw new ApiError(`Order ${row}: delivery date cannot be in the past`);
+      if (!allowedPaymentMethods.has(paymentMethod)) throw new ApiError(`Order ${row}: invalid payment method`);
+      if (!allowedPaymentStatuses.has(paymentStatus)) throw new ApiError(`Order ${row}: invalid payment status`);
+      if (!allowedStatuses.has(status)) throw new ApiError(`Order ${row}: invalid order status`);
+      if (items.length === 0) throw new ApiError(`Order ${row}: add at least one item`);
+      if (items.length > 50) throw new ApiError(`Order ${row}: an order can contain at most 50 distinct items`);
+
+      const specialInstructions = String(entry.specialInstructions || "").trim() || null;
+      if (specialInstructions && specialInstructions.length > 1000) throw new ApiError(`Order ${row}: special instructions are too long`);
+
+      const normalizedItems = items.map((item) => {
+        const menuItemId = String(item.menuItemId || "");
+        const quantity = number(item.quantity);
+        if (!menuItemId || !Number.isInteger(quantity) || quantity < 1 || quantity > 100) throw new ApiError(`Order ${row}: invalid item or quantity`);
+        return { menuItemId, quantity };
+      });
+      if (new Set(normalizedItems.map((item) => item.menuItemId)).size !== normalizedItems.length) throw new ApiError(`Order ${row}: duplicate menu items must be combined`);
+
+      return {
+        row, customerName, customerEmail, customerPhone, deliveryDate, street, city, state, zip,
+        paymentMethod, paymentStatus, status,
+        specialInstructions,
+        items: normalizedItems,
+      };
+    });
+
+    const menuItemIds = [...new Set(normalized.flatMap((order) => order.items.map((item) => item.menuItemId)))];
+    const menuItems = await prisma.menuItem.findMany({ where: { id: { in: menuItemIds }, isActive: true } });
+    if (menuItems.length !== menuItemIds.length) throw new ApiError("One or more imported menu items are unavailable");
+    const menuById = new Map(menuItems.map((item) => [item.id, item]));
+    const settings = await prisma.setting.findMany({ where: { key: { in: ["tax_rate", "delivery_fee", "free_delivery_minimum"] } } });
+    const setting = (key: string, fallback: number) => number(settings.find((item) => item.key === key)?.value, fallback);
+
+    const created = await prisma.$transaction(async (tx) => {
+      const results = [];
+      for (const order of normalized) {
+        let customer = await tx.user.findUnique({ where: { email: order.customerEmail } });
+        if (!customer) {
+          if (order.customerPhone) {
+            const phoneOwner = await tx.user.findUnique({ where: { phone: order.customerPhone } });
+            if (phoneOwner) throw new ApiError(`Order ${order.row}: phone number belongs to another customer`, 409);
+          }
+          customer = await tx.user.create({ data: { name: order.customerName, email: order.customerEmail, phone: order.customerPhone } });
+        } else if (order.customerPhone && customer.phone && customer.phone !== order.customerPhone) {
+          throw new ApiError(`Order ${order.row}: email and phone belong to different customer records`, 409);
+        } else if (!customer.phone && order.customerPhone) {
+          customer = await tx.user.update({ where: { id: customer.id }, data: { phone: order.customerPhone } });
+        }
+
+        const address = await tx.address.findFirst({ where: {
+          userId: customer.id, street: { equals: order.street, mode: "insensitive" },
+          city: { equals: order.city, mode: "insensitive" }, state: { equals: order.state, mode: "insensitive" }, zip: order.zip,
+        } }) ?? await tx.address.create({ data: {
+          userId: customer.id, label: "Imported", street: order.street, city: order.city, state: order.state, zip: order.zip,
+        } });
+
+        const rows = order.items.map((item) => {
+          const menuItem = menuById.get(item.menuItemId)!;
+          return { menuItemId: menuItem.id, name: menuItem.name, price: menuItem.price, quantity: item.quantity, imageUrl: menuItem.imageUrl };
+        });
+        const subtotal = rows.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const tax = Math.round(subtotal * (setting("tax_rate", 5) / 100) * 100) / 100;
+        const deliveryFee = subtotal >= setting("free_delivery_minimum", 200) ? 0 : setting("delivery_fee", 0);
+        const total = subtotal + tax + deliveryFee;
+
+        for (const item of rows) {
+          const reserved = await tx.dailyMenu.updateMany({
+            where: { date: order.deliveryDate, menuItemId: item.menuItemId, isAvailable: true, remainingQty: { gte: item.quantity } },
+            data: { remainingQty: { decrement: item.quantity } },
+          });
+          if (reserved.count !== 1) throw new ApiError(`Order ${order.row}: ${item.name} is unavailable for ${order.deliveryDate.toISOString().slice(0, 10)}`, 409);
+        }
+
+        const orderNumber = `MSI${Date.now()}${randomUUID().slice(0, 8).toUpperCase()}`;
+        const result = await tx.order.create({ data: {
+          userId: customer.id, addressId: address.id, orderNumber,
+          subtotal, tax, deliveryFee, discount: 0, total,
+          paymentMethod: order.paymentMethod as never, paymentStatus: order.paymentStatus as never,
+          status: order.status as never, deliveryDate: order.deliveryDate,
+          specialInstructions: order.specialInstructions,
+          items: { create: rows },
+          statusHistory: { create: { status: order.status as never, changedBy: user.id, note: "Order imported by administrator" } },
+        }, include: { items: true, address: true, user: { select: { id: true, name: true, email: true, phone: true } } } });
+        await tx.notification.create({ data: { userId: customer.id, title: "Order added", body: `Order #${orderNumber} was added by our team.`, type: "ORDER_CONFIRMATION", data: { orderId: result.id, imported: true } } });
+        results.push(result);
+      }
+      await tx.auditLog.create({ data: {
+        userId: user.id,
+        action: "IMPORT_ORDERS",
+        entity: "Order",
+        newData: { count: results.length, orderIds: results.map((order) => order.id) },
+      } });
+      return results;
+    }, { maxWait: 15000, timeout: 60000 });
+
+    return ok(created, { imported: created.length });
   }
 
   if (method === "POST" && route === "orders") {

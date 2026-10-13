@@ -14,6 +14,12 @@ If you use the GitHub Student Developer Pack, activate the Clerk offer from the 
 
 Create one Clerk application. Enable Email/Password and any social providers you want, such as Google.
 
+For production security, open **Clerk Dashboard → Sessions** and configure both
+the maximum session lifetime and session inactivity timeout to **30 minutes**.
+The web application also enforces both 30-minute limits in the browser, but
+Clerk's server-side settings are required so API access expires even if
+client-side JavaScript is disabled or modified.
+
 Copy these values from Clerk into `apps/web/.env.local`:
 
 ```env
